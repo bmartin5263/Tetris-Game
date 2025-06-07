@@ -11,18 +11,22 @@
 #include "LEDChain.h"
 #include "Types.h"
 #include "Assertions.h"
+#include "Timer.h"
 
 template<size_t COLUMNS, size_t ROWS>
 class Tetris {
+public:
+  constexpr static auto SIZE = COLUMNS * ROWS;
+  constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 0 };
+
   using Duration = rgb::Duration;
   using Point = rgb::Point;
   using LEDChain = rgb::LEDChain;
   using Every = rgb::Every;
   using Color = rgb::Color;
-
-public:
-  constexpr static auto SIZE = COLUMNS * ROWS;
-  constexpr static auto START_POSITION = Point { static_cast<int>(COLUMNS / 2) - 1, 0 };
+  using Cell = Color;
+  using Board = std::array<Cell, SIZE>;
+  using TimerHandle = rgb::TimerHandle;
 
   Tetris();
 
@@ -43,42 +47,62 @@ private:
   auto canPlaceTetromino(const Tetromino* tetromino, Point position) -> bool;
   auto canPlaceTetrominoAtOffset(Point offset) -> bool;
 
-  std::array<Color, SIZE> board{Color::OFF()};
+  struct PickUpCurrentTetromino {
+    Tetris<COLUMNS, ROWS>& tetris;
+    PickUpCurrentTetromino(Tetris<COLUMNS, ROWS>& tetris): tetris(tetris) {
+      tetris.removeCurrentTetromino();
+    }
+
+    ~PickUpCurrentTetromino() {
+      tetris.placeCurrentTetromino();
+    }
+  };
+
+  Board board{Color::OFF()};
   const Tetromino* currentTetromino{&Tetromino::O};
   Point currentPosition{START_POSITION};
   Every autoDropTimer = Every(Duration::Seconds(1), [this]() {
     autoDrop();
   });
+  TimerHandle clearRowsHandle{};
   bool gameOver{false};
 };
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> void {
-  removeCurrentTetromino();
-  if (canPlaceTetromino(currentTetromino, currentPosition + movement)) {
-    currentPosition += movement;
+  bool isDrop = movement.y > 0;
+  bool didMove = false;
+  {
+    auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
+    if (canPlaceTetromino(currentTetromino, currentPosition + movement)) {
+      currentPosition += movement;
+      if (movement.y > 0) {
+        autoDropTimer.reset();
+      }
+      didMove = true;
+    }
   }
-  placeCurrentTetromino();
+  if (!didMove && isDrop) {
+    nextTetromino();
+  }
 }
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::rotateTetrominoLeft() -> void {
-  removeCurrentTetromino();
+  auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
   auto rotated = currentTetromino->leftRotation;
   if (canPlaceTetromino(rotated, currentPosition)) {
     currentTetromino = rotated;
   }
-  placeCurrentTetromino();
 }
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::rotateTetrominoRight() -> void {
-  removeCurrentTetromino();
+  auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
   auto rotated = currentTetromino->rightRotation;
   if (canPlaceTetromino(rotated, currentPosition)) {
     currentTetromino = rotated;
   }
-  placeCurrentTetromino();
 }
 
 template<size_t COLUMNS, size_t ROWS>
@@ -104,9 +128,8 @@ template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::autoDrop() -> void {
   auto offset = Point {0, 1};
   if (canPlaceTetrominoAtOffset(offset)) {
-    removeCurrentTetromino();
+    auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
     currentPosition += offset;
-    placeCurrentTetromino();
   }
   else {
     nextTetromino();
@@ -132,10 +155,9 @@ auto Tetris<COLUMNS, ROWS>::nextTetromino() -> void {
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::canPlaceTetrominoAtOffset(Point offset) -> bool {
-  removeCurrentTetromino();
+  auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
   auto pos = currentPosition + offset;
   auto canPlace = canPlaceTetromino(currentTetromino, pos);
-  placeCurrentTetromino();
   return canPlace;
 }
 
@@ -151,13 +173,14 @@ auto Tetris<COLUMNS, ROWS>::placeTetromino(const Tetromino* tetromino, Point pos
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::canPlaceTetromino(const Tetromino* tetromino, Point position) -> bool {
-  for (auto& offset : tetromino->body) {
-    auto pos = position + offset;
-    if (pos.x < 0 || pos.x >= COLUMNS || pos.y < 0 || pos.y >= ROWS || board[pos.flatten(COLUMNS)] != Color::OFF()) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(tetromino->begin(), tetromino->end(), [&](auto offset){
+    auto actualPosition = position + offset;
+    return actualPosition.x >= 0
+        && actualPosition.x < COLUMNS
+        && actualPosition.y >= 0
+        && actualPosition.y < ROWS
+        && board[actualPosition.flatten(COLUMNS)] == Color::OFF();
+  });
 }
 
 template<size_t COLUMNS, size_t ROWS>

@@ -5,19 +5,21 @@
 #include "GameScene.h"
 #include "IRReceiver.h"
 
+#include <chrono>
+
 using namespace rgb;
+
+auto irReceiver = IRReceiver{D3};
+auto sensors = std::array {
+  Runnable { []() {
+    irReceiver.update();
+  }},
+};
 
 auto grid = LEDCircuit<64>(D2_RGB);
 auto debugLeds = grid.slice(8);
 auto leds = std::array {
   static_cast<Drawable*>(&grid)
-};
-
-auto irReceiver = IRReceiver{D3};
-auto sensors = std::array<Runnable, 1>{
-  Runnable { []() {
-    irReceiver.update();
-  }},
 };
 
 auto gameScene = GameScene{grid, irReceiver};

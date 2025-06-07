@@ -18,6 +18,9 @@ class Tetromino {
   Tetromino(Color color, std::array<Point, 4> body, const Tetromino* leftRotation, const Tetromino* rightRotation);
 
 public:
+  auto begin() const -> const Point* { return body.begin(); }
+  auto end() const -> const Point* { return body.end(); }
+
   const Color color;
   const std::array<Point, 4> body;
   const Tetromino* const leftRotation;
@@ -26,7 +29,6 @@ public:
   static auto Random() -> const Tetromino*;
 
 public:
-  // Square
   static const Tetromino O;
   static const Tetromino J_0;
   static const Tetromino J_1;

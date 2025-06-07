@@ -51,6 +51,7 @@ const std::array<const Tetromino*, 7> Tetromino::STARTERS = std::array {
   &Tetromino::I_0
 };
 
+// TODO - micros() is bad random seed
 auto Tetromino::Random() -> const Tetromino* {
 
   // Create a random device and seed the generator with a high-resolution clock
