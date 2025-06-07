@@ -7,8 +7,7 @@
 
 using namespace rgb;
 
-GameScene::GameScene(rgb::LEDChain& grid, IRReceiver& irReceiver): grid(grid), irReceiver(irReceiver) {
-
+GameScene::GameScene(PixelList& grid, IRReceiver& irReceiver): grid{grid}, irReceiver{irReceiver} {
 }
 
 auto GameScene::setup() -> void {
@@ -24,6 +23,10 @@ auto GameScene::setup() -> void {
   irReceiver.buttonOk.onPress([this](){
     tetris.rotateTetrominoRight();
   });
+  irReceiver.buttonStar.onPress([this](){
+    tetris.newGame();
+  });
+  tetris.newGame();
 }
 
 auto GameScene::update() -> void {

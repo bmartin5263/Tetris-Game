@@ -1,25 +1,23 @@
 #include <Arduino.h>
 #include "AppBuilder.h"
 #include "App.h"
-#include "LEDCircuit.h"
+#include "LEDMatrix.h"
 #include "GameScene.h"
 #include "IRReceiver.h"
 
-#include <chrono>
-
 using namespace rgb;
 
-auto irReceiver = IRReceiver{D3};
+auto irReceiver = IRReceiver{};
 auto sensors = std::array {
   Runnable { []() {
     irReceiver.update();
   }},
 };
 
-auto grid = LEDCircuit<64>(D2_RGB);
+auto grid = LEDMatrix<8, 8>(D2_RGB);
 auto debugLeds = grid.slice(8);
 auto leds = std::array {
-  static_cast<Drawable*>(&grid)
+  static_cast<LEDList*>(&grid)
 };
 
 auto gameScene = GameScene{grid, irReceiver};
@@ -28,9 +26,9 @@ auto scenes = std::array {
 };
 
 void setup() {
-  irReceiver.start();
+  delay(1000);
+  irReceiver.start(D3);
   AppBuilder::Create()
-      .EnableIntroScene(gameScene, Duration::Seconds(1))
       .SetScenes(scenes)
       .SetLEDs(leds)
       .SetSensors(sensors)

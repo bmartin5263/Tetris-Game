@@ -6,7 +6,7 @@
 #define TETRISGAME_GAMESCENE_H
 
 #include "Scene.h"
-#include "LEDChain.h"
+#include "PixelList.h"
 #include "Tetris.h"
 
 namespace rgb {
@@ -17,7 +17,7 @@ class GameScene : public rgb::Scene {
 public:
   constexpr static auto SIZE = 8;
 
-  explicit GameScene(rgb::LEDChain& grid, rgb::IRReceiver& irReceiver);
+  explicit GameScene(rgb::PixelList& grid, rgb::IRReceiver& irReceiver);
 
   auto update() -> void override;
   auto draw() -> void override;
@@ -25,8 +25,8 @@ public:
   auto cleanup() -> void override;
 
 private:
-  Tetris<SIZE, SIZE> tetris;
-  rgb::LEDChain& grid;
+  Tetris<SIZE, SIZE> tetris{};
+  rgb::PixelList& grid;
   rgb::IRReceiver& irReceiver;
 
 };
