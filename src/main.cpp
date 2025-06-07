@@ -26,7 +26,6 @@ auto scenes = std::array {
 };
 
 void setup() {
-  delay(1000);
   irReceiver.start(D3);
   AppBuilder::Create()
       .SetScenes(scenes)

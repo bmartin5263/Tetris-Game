@@ -28,18 +28,17 @@ public:
   using Board = std::array<std::array<Cell, COLUMNS>, ROWS>;
   using TimerHandle = rgb::TimerHandle;
 
-  Tetris();
-
   auto newGame() -> void;
   auto update() -> void;
   auto draw(PixelList& ledChain) -> void;
 
   auto moveTetromino(Point movement) -> void;
+  auto dropTetromino() -> void;
   auto rotateTetrominoLeft() -> void;
   auto rotateTetrominoRight() -> void;
 
 private:
-  auto autoDrop() -> void;
+  auto autoFall() -> bool;
   auto nextTetromino() -> void;
   auto placeCurrentTetromino() -> void { placeTetromino(currentTetromino, currentPosition); }
   auto removeCurrentTetromino() -> void { removeTetromino(currentTetromino, currentPosition); }
@@ -64,11 +63,19 @@ private:
   const Tetromino* currentTetromino{&Tetromino::O};
   Point currentPosition{START_POSITION};
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
-    autoDrop();
+    autoFall();
   }};
   TimerHandle clearRowsHandle{};
   bool gameOver{false};
 };
+
+template<size_t COLUMNS, size_t ROWS>
+auto Tetris<COLUMNS, ROWS>::dropTetromino() -> void {
+  if (gameOver) {
+    return;
+  }
+  while (autoFall());
+}
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::newGame() -> void {
@@ -76,6 +83,7 @@ auto Tetris<COLUMNS, ROWS>::newGame() -> void {
   std::for_each(board.begin(), board.end(), [](auto& row) {
     std::fill(row.begin(), row.end(), Color::OFF());
   });
+  gameOver = false;
   autoDropTimer.reset();
   nextTetromino();
 }
@@ -90,6 +98,10 @@ auto Tetris<COLUMNS, ROWS>::shouldClearRows() -> bool {
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> void {
+  if (gameOver) {
+    return;
+  }
+
   bool isDrop = movement.y > 0;
   bool didMove = false;
   {
@@ -109,6 +121,9 @@ auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> void {
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::rotateTetrominoLeft() -> void {
+  if (gameOver) {
+    return;
+  }
   auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
   auto rotated = currentTetromino->leftRotation;
   if (canPlaceTetromino(rotated, currentPosition)) {
@@ -118,17 +133,14 @@ auto Tetris<COLUMNS, ROWS>::rotateTetrominoLeft() -> void {
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::rotateTetrominoRight() -> void {
+  if (gameOver) {
+    return;
+  }
   auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
   auto rotated = currentTetromino->rightRotation;
   if (canPlaceTetromino(rotated, currentPosition)) {
     currentTetromino = rotated;
   }
-}
-
-template<size_t COLUMNS, size_t ROWS>
-Tetris<COLUMNS, ROWS>::Tetris() {
-//  nextTetromino();
-//  autoDropTimer.reset();
 }
 
 template<size_t COLUMNS, size_t ROWS>
@@ -149,15 +161,17 @@ auto Tetris<COLUMNS, ROWS>::draw(PixelList& ledChain) -> void {
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::autoDrop() -> void {
+auto Tetris<COLUMNS, ROWS>::autoFall() -> bool {
   INFO("AutoDrop");
   auto offset = Point {0, 1};
   if (canPlaceTetrominoAtOffset(offset)) {
     auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
     currentPosition += offset;
+    return true;
   }
   else {
     nextTetromino();
+    return false;
   }
 }
 
@@ -165,6 +179,7 @@ template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::nextTetromino() -> void {
   currentPosition = START_POSITION;
   currentTetromino = Tetromino::Random();
+  autoDropTimer.reset();
 
   if (!canPlaceTetromino(currentTetromino, currentPosition)) {
     for (auto& row : board) {

@@ -26,6 +26,9 @@ auto GameScene::setup() -> void {
   irReceiver.buttonStar.onPress([this](){
     tetris.newGame();
   });
+  irReceiver.button0.onPress([this](){
+    tetris.dropTetromino();
+  });
   tetris.newGame();
 }
 
