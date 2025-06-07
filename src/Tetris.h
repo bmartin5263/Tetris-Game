@@ -13,6 +13,36 @@
 #include "Assertions.h"
 #include "Timer.h"
 
+using Cell = rgb::Color;
+
+template<size_t COLUMNS>
+struct Row {
+  using Color = rgb::Color;
+
+  std::array<Cell, COLUMNS> data;
+
+  auto operator[](size_t index) -> Color& {
+    return data[index];
+  }
+
+  auto begin() {
+    return data.begin();
+  }
+
+  auto end() {
+    return data.end();
+  }
+
+  auto isFilled() -> bool {
+    auto isNotOff = [](auto& c) { return c != Color::OFF(); };
+    return std::all_of(data.begin(), data.end(), isNotOff);
+  }
+
+  auto clear() -> void {
+    data.fill(Color::OFF());
+  }
+};
+
 template<size_t COLUMNS, size_t ROWS>
 class Tetris {
 public:
@@ -24,8 +54,7 @@ public:
   using PixelList = rgb::PixelList;
   using Every = rgb::Every;
   using Color = rgb::Color;
-  using Cell = Color;
-  using Board = std::array<std::array<Cell, COLUMNS>, ROWS>;
+  using Board = std::array<Row<COLUMNS>, ROWS>;
   using TimerHandle = rgb::TimerHandle;
 
   auto newGame() -> void;
@@ -46,7 +75,7 @@ private:
   auto removeTetromino(const Tetromino* tetromino, Point position) -> void;
   auto canPlaceTetromino(const Tetromino* tetromino, Point position) -> bool;
   auto canPlaceTetrominoAtOffset(Point offset) -> bool;
-  auto shouldClearRows() -> bool;
+  auto clearRows() -> void;
 
   struct PickUpCurrentTetromino {
     Tetris<COLUMNS, ROWS>& tetris;
@@ -65,7 +94,6 @@ private:
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
     autoFall();
   }};
-  TimerHandle clearRowsHandle{};
   bool gameOver{false};
 };
 
@@ -83,17 +111,46 @@ auto Tetris<COLUMNS, ROWS>::newGame() -> void {
   std::for_each(board.begin(), board.end(), [](auto& row) {
     std::fill(row.begin(), row.end(), Color::OFF());
   });
+
+  auto off = Color::OFF();
+  auto red = Color::RED();
+  auto blu = Color::BLUE();
+  auto gre = Color::GREEN();
+  auto yel = Color::YELLOW();
+  board = {
+    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
+    Row<COLUMNS> {gre, off, off, off, off, off, off, off},
+    Row<COLUMNS> {red, off, off, off, off, off, off, off},
+    Row<COLUMNS> {blu, off, off, off, off, off, off, off},
+    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
+    Row<COLUMNS> {blu, off, blu, blu, blu, blu, blu, off},
+    Row<COLUMNS> {gre, off, gre, gre, gre, gre, gre, off},
+    Row<COLUMNS> {red, red, red, red, red, red, red, off}
+  };
+
   gameOver = false;
-  autoDropTimer.reset();
   nextTetromino();
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::shouldClearRows() -> bool {
-  for (auto& row : board) {
+auto Tetris<COLUMNS, ROWS>::clearRows() -> void {
+//  for (auto& row : board) {
+//    if (row.isFilled()) {
+//      row.clear();
+//    }
+//  }
+  for (int rowNum = 0; rowNum < ROWS; ++rowNum) {
+    auto& row = board[rowNum];
+    if (row.isFilled()) {
+      auto rowToDropNum = rowNum;
+      while (rowToDropNum > 0) {
+        board[rowToDropNum] = board[rowToDropNum - 1];
+        --rowToDropNum;
+      }
 
+      board[0].clear();
+    }
   }
-  return false;
 }
 
 template<size_t COLUMNS, size_t ROWS>
@@ -157,7 +214,7 @@ auto Tetris<COLUMNS, ROWS>::draw(PixelList& ledChain) -> void {
       ledChain[((row * ROWS) + col)] = board[row][col];
     }
   }
-  ledChain[((currentPosition.y * ROWS) + currentPosition.x)] = Color::WHITE();
+//  ledChain[((currentPosition.y * ROWS) + currentPosition.x)] = Color::WHITE();
 }
 
 template<size_t COLUMNS, size_t ROWS>
@@ -177,6 +234,8 @@ auto Tetris<COLUMNS, ROWS>::autoFall() -> bool {
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::nextTetromino() -> void {
+  clearRows();
+
   currentPosition = START_POSITION;
   currentTetromino = Tetromino::Random();
   autoDropTimer.reset();
@@ -231,7 +290,7 @@ auto Tetris<COLUMNS, ROWS>::removeTetromino(const Tetromino* tetromino, Point po
     auto pos = position + offset;
     ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
     ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
-    ASSERT(board[pos.y][pos.x] != Color::OFF(), "No tetromino found");
+//    ASSERT(board[pos.y][pos.x] != Color::OFF(), "No tetromino found");
     board[pos.y][pos.x] = Color::OFF();
   }
 }
