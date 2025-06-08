@@ -17,7 +17,7 @@ auto sensors = std::array {
 auto grid = LEDMatrix<8, 8>(D2_RGB);
 auto debugLeds = grid.slice(8);
 auto leds = std::array {
-  static_cast<LEDList*>(&grid)
+  static_cast<LEDCircuit*>(&grid)
 };
 
 auto gameScene = GameScene{grid, irReceiver};
@@ -27,6 +27,7 @@ auto scenes = std::array {
 
 void setup() {
   irReceiver.start(D3);
+  DebugScreen::Start(true);
   AppBuilder::Create()
       .SetScenes(scenes)
       .SetLEDs(leds)
@@ -36,5 +37,8 @@ void setup() {
 }
 
 void loop() {
+  if (DebugScreen::ReadyForUpdate()) {
+    DebugScreen::Display();
+  }
   App::Loop();
 }

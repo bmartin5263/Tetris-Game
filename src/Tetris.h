@@ -12,6 +12,7 @@
 #include "Types.h"
 #include "Assertions.h"
 #include "Timer.h"
+#include "Score.h"
 
 using Cell = rgb::Color;
 
@@ -48,6 +49,7 @@ class Tetris {
 public:
   constexpr static auto SIZE = COLUMNS * ROWS;
   constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 0 };
+  constexpr static auto POINT_VALUES = std::array { 100, 300, 1200, 3600 };
 
   using Duration = rgb::Duration;
   using Point = rgb::Point;
@@ -57,14 +59,16 @@ public:
   using Board = std::array<Row<COLUMNS>, ROWS>;
   using TimerHandle = rgb::TimerHandle;
 
-  auto newGame() -> void;
+  // TODO - extract out
   auto update() -> void;
   auto draw(PixelList& ledChain) -> void;
 
+  auto newGame() -> void;
   auto moveTetromino(Point movement) -> void;
   auto dropTetromino() -> void;
   auto rotateTetrominoLeft() -> void;
   auto rotateTetrominoRight() -> void;
+  auto getScore() -> const Score&;
 
 private:
   auto autoFall() -> bool;
@@ -75,7 +79,8 @@ private:
   auto removeTetromino(const Tetromino* tetromino, Point position) -> void;
   auto canPlaceTetromino(const Tetromino* tetromino, Point position) -> bool;
   auto canPlaceTetrominoAtOffset(Point offset) -> bool;
-  auto clearRows() -> void;
+  auto clearRows() -> size_t;
+  auto clearRow(size_t rowNum) -> void;
 
   struct PickUpCurrentTetromino {
     Tetris<COLUMNS, ROWS>& tetris;
@@ -94,8 +99,14 @@ private:
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
     autoFall();
   }};
+  Score score{};
   bool gameOver{false};
 };
+
+template<size_t COLUMNS, size_t ROWS>
+auto Tetris<COLUMNS, ROWS>::getScore() -> const Score& {
+  return score;
+}
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::dropTetromino() -> void {
@@ -112,45 +123,47 @@ auto Tetris<COLUMNS, ROWS>::newGame() -> void {
     std::fill(row.begin(), row.end(), Color::OFF());
   });
 
-  auto off = Color::OFF();
-  auto red = Color::RED();
-  auto blu = Color::BLUE();
-  auto gre = Color::GREEN();
-  auto yel = Color::YELLOW();
-  board = {
-    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
-    Row<COLUMNS> {gre, off, off, off, off, off, off, off},
-    Row<COLUMNS> {red, off, off, off, off, off, off, off},
-    Row<COLUMNS> {blu, off, off, off, off, off, off, off},
-    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
-    Row<COLUMNS> {blu, off, blu, blu, blu, blu, blu, off},
-    Row<COLUMNS> {gre, off, gre, gre, gre, gre, gre, off},
-    Row<COLUMNS> {red, red, red, red, red, red, red, off}
-  };
+//  auto off = Color::OFF();
+//  auto red = Color::RED();
+//  auto blu = Color::BLUE();
+//  auto gre = Color::GREEN();
+//  auto yel = Color::YELLOW();
+//  board = {
+//    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {gre, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {red, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {blu, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {blu, off, blu, blu, blu, blu, blu, off},
+//    Row<COLUMNS> {gre, off, gre, gre, gre, gre, gre, off},
+//    Row<COLUMNS> {red, red, red, red, red, red, red, off}
+//  };
 
   gameOver = false;
   nextTetromino();
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::clearRows() -> void {
-//  for (auto& row : board) {
-//    if (row.isFilled()) {
-//      row.clear();
-//    }
-//  }
-  for (int rowNum = 0; rowNum < ROWS; ++rowNum) {
+auto Tetris<COLUMNS, ROWS>::clearRows() -> size_t {
+  auto rowsCleared = 0;
+  for (size_t rowNum = 0; rowNum < ROWS; ++rowNum) {
     auto& row = board[rowNum];
     if (row.isFilled()) {
-      auto rowToDropNum = rowNum;
-      while (rowToDropNum > 0) {
-        board[rowToDropNum] = board[rowToDropNum - 1];
-        --rowToDropNum;
-      }
-
-      board[0].clear();
+      clearRow(rowNum);
+      ++rowsCleared;
     }
   }
+  return rowsCleared;
+}
+
+template<size_t COLUMNS, size_t ROWS>
+auto Tetris<COLUMNS, ROWS>::clearRow(size_t rowNum) -> void {
+  auto rowToDropNum = rowNum;
+  while (rowToDropNum > 0) {
+    board[rowToDropNum] = board[rowToDropNum - 1];
+    --rowToDropNum;
+  }
+  board[0].clear();
 }
 
 template<size_t COLUMNS, size_t ROWS>
@@ -159,8 +172,8 @@ auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> void {
     return;
   }
 
-  bool isDrop = movement.y > 0;
-  bool didMove = false;
+  auto isDrop = movement.y > 0;
+  auto didMove = false;
   {
     auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
     if (canPlaceTetromino(currentTetromino, currentPosition + movement)) {
@@ -234,7 +247,12 @@ auto Tetris<COLUMNS, ROWS>::autoFall() -> bool {
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::nextTetromino() -> void {
-  clearRows();
+  auto rowsCleared = clearRows();
+  if (rowsCleared > 0) {
+    score.points += POINT_VALUES[rowsCleared - 1];
+    score.clearedRows += rowsCleared;
+    score.combos[rowsCleared - 1] += 1;
+  }
 
   currentPosition = START_POSITION;
   currentTetromino = Tetromino::Random();

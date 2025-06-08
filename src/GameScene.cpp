@@ -4,6 +4,7 @@
 
 #include "GameScene.h"
 #include "IRReceiver.h"
+#include "DebugScreen.h"
 
 using namespace rgb;
 
@@ -38,6 +39,12 @@ auto GameScene::update() -> void {
 
 auto GameScene::draw() -> void {
   tetris.draw(grid);
+  auto fpsStr = "FPS: " + std::to_string(Clock::Fps());
+  auto pointsStr = "Points: " + std::to_string(tetris.getScore().points);
+  auto rowsStr = "Rows: " + std::to_string(tetris.getScore().clearedRows);
+  DebugScreen::PrintLine(0, pointsStr);
+  DebugScreen::PrintLine(1, rowsStr);
+  DebugScreen::PrintLine(4, fpsStr);
 }
 
 auto GameScene::cleanup() -> void {
