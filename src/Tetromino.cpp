@@ -31,8 +31,8 @@ const Tetromino Tetromino::Z_1(Color::GREEN(), {Point{1, -1}, {1, 0}, {0, 0}, {0
 const Tetromino Tetromino::S_0(Color::MAGENTA(), {Point{1, 0}, {2, 0}, {0, 1}, {1, 1}}, &S_1, &S_1);
 const Tetromino Tetromino::S_1(Color::MAGENTA(), {Point{0, -1}, {0, 0}, {1, 0}, {1, 1}}, &S_0, &S_0);
 
-const Tetromino Tetromino::I_0(Color::RED(), {Point{0, 1}, {1, 1}, {2, 1}, {3, 1}}, &I_1, &I_1);
-const Tetromino Tetromino::I_1(Color::RED(), {Point{2, -2}, {2, -1}, {2, 0}, {2, 1}}, &I_0, &I_0);
+const Tetromino Tetromino::I_0(Color::RED(), {Point{0, 0}, {1, 0}, {2, 0}, {3, 0}}, &I_1, &I_1);
+const Tetromino Tetromino::I_1(Color::RED(), {Point{2, -1}, {2, 0}, {2, 1}, {2, 2}}, &I_0, &I_0);
 
 Tetromino::Tetromino(Tetromino::Color color, std::array<Point, 4> body, const Tetromino* leftRotation,
                      const Tetromino* rightRotation)

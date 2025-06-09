@@ -4,6 +4,7 @@
 #include "LEDMatrix.h"
 #include "GameScene.h"
 #include "IRReceiver.h"
+#include "PixelSlice.h"
 
 using namespace rgb;
 

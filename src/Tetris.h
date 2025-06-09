@@ -13,6 +13,8 @@
 #include "Assertions.h"
 #include "Timer.h"
 #include "Score.h"
+#include "MoveResult.h"
+#include "Iterable.h"
 
 using Cell = rgb::Color;
 
@@ -51,40 +53,56 @@ public:
   constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 0 };
   constexpr static auto POINT_VALUES = std::array { 100, 300, 1200, 3600 };
 
-  using Duration = rgb::Duration;
   using Point = rgb::Point;
   using PixelList = rgb::PixelList;
-  using Every = rgb::Every;
   using Color = rgb::Color;
   using Board = std::array<Row<COLUMNS>, ROWS>;
-  using TimerHandle = rgb::TimerHandle;
+  template<typename T>
+  using Iterable = rgb::Iterable<T>;
 
-  // TODO - extract out
-  auto update() -> void;
   auto draw(PixelList& ledChain) -> void;
 
+  // Initializes a new game
   auto newGame() -> void;
-  auto moveTetromino(Point movement) -> void;
-  auto dropTetromino() -> void;
+  auto nextTetromino() -> void;
+  auto clearRows(const std::array<size_t, 4> rows, size_t count) -> void;
+
+
+  auto moveTetromino(Point movement) -> MoveResult;
+  auto dropTetromino() -> MoveResult;
   auto rotateTetrominoLeft() -> void;
   auto rotateTetrominoRight() -> void;
   auto getScore() -> const Score&;
 
+  auto columnCount() -> size_t { return COLUMNS; }
+
+  Board board{Color::OFF()};
 private:
-  auto autoFall() -> bool;
-  auto nextTetromino() -> void;
-  auto placeCurrentTetromino() -> void { placeTetromino(currentTetromino, currentPosition); }
-  auto removeCurrentTetromino() -> void { removeTetromino(currentTetromino, currentPosition); }
+  const Tetromino* currentTetromino{&Tetromino::O};
+  Point currentPosition{START_POSITION};
+  Score score{};
+  bool gameOver{false};
+
+  auto placeCurrentTetromino() -> void {
+    INFO("PLACE CURRENT TETROMINO");
+    placeTetromino(currentTetromino, currentPosition);
+  }
+
+  auto removeCurrentTetromino() -> void {
+    INFO("REMOVE CURRENT TETROMINO");
+    removeTetromino(currentTetromino, currentPosition);
+  }
+
   auto placeTetromino(const Tetromino* tetromino, Point position) -> void;
   auto removeTetromino(const Tetromino* tetromino, Point position) -> void;
   auto canPlaceTetromino(const Tetromino* tetromino, Point position) -> bool;
-  auto canPlaceTetrominoAtOffset(Point offset) -> bool;
-  auto clearRows() -> size_t;
+  auto canPlaceCurrentTetrominoAtOffset(Point offset) -> bool;
   auto clearRow(size_t rowNum) -> void;
+  auto calculateRowsToClear(MoveResult& result) -> void;
 
   struct PickUpCurrentTetromino {
     Tetris<COLUMNS, ROWS>& tetris;
-    PickUpCurrentTetromino(Tetris<COLUMNS, ROWS>& tetris): tetris(tetris) {
+    explicit PickUpCurrentTetromino(Tetris<COLUMNS, ROWS>& tetris): tetris(tetris) {
       tetris.removeCurrentTetromino();
     }
 
@@ -92,15 +110,6 @@ private:
       tetris.placeCurrentTetromino();
     }
   };
-
-  Board board{Color::OFF()};
-  const Tetromino* currentTetromino{&Tetromino::O};
-  Point currentPosition{START_POSITION};
-  Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
-    autoFall();
-  }};
-  Score score{};
-  bool gameOver{false};
 };
 
 template<size_t COLUMNS, size_t ROWS>
@@ -109,52 +118,72 @@ auto Tetris<COLUMNS, ROWS>::getScore() -> const Score& {
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::dropTetromino() -> void {
+auto Tetris<COLUMNS, ROWS>::dropTetromino() -> MoveResult {
   if (gameOver) {
-    return;
+    return {};
   }
-  while (autoFall());
+  auto offset = Point {0, 1};
+  while (canPlaceCurrentTetrominoAtOffset(offset)) {
+    ++offset.y;
+  }
+  --offset.y;
+  auto result = moveTetromino(offset);
+  result.nextTetromino = true;
+  calculateRowsToClear(result);
+  return result;
 }
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::newGame() -> void {
-  INFO("START()");
+  INFO("NEW GAME");
   std::for_each(board.begin(), board.end(), [](auto& row) {
     std::fill(row.begin(), row.end(), Color::OFF());
   });
 
-//  auto off = Color::OFF();
-//  auto red = Color::RED();
-//  auto blu = Color::BLUE();
-//  auto gre = Color::GREEN();
-//  auto yel = Color::YELLOW();
-//  board = {
-//    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
-//    Row<COLUMNS> {gre, off, off, off, off, off, off, off},
-//    Row<COLUMNS> {red, off, off, off, off, off, off, off},
-//    Row<COLUMNS> {blu, off, off, off, off, off, off, off},
-//    Row<COLUMNS> {yel, off, off, off, off, off, off, off},
-//    Row<COLUMNS> {blu, off, blu, blu, blu, blu, blu, off},
-//    Row<COLUMNS> {gre, off, gre, gre, gre, gre, gre, off},
-//    Row<COLUMNS> {red, red, red, red, red, red, red, off}
-//  };
-
   gameOver = false;
   nextTetromino();
+
+  auto off = Color::OFF();
+  auto red = Color::RED();
+  auto blu = Color::BLUE();
+  auto gre = Color::GREEN();
+  auto yel = Color::YELLOW();
+  board = {
+    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+    Row<COLUMNS> {yel, yel, yel, yel, yel, off, yel, yel},
+    Row<COLUMNS> {blu, blu, blu, blu, blu, blu, blu, blu},
+    Row<COLUMNS> {gre, gre, gre, gre, gre, off, gre, gre},
+    Row<COLUMNS> {red, red, red, red, red, red, red, red}
+  };
+  placeCurrentTetromino();
+
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::clearRows() -> size_t {
-  auto rowsCleared = 0;
+auto Tetris<COLUMNS, ROWS>::calculateRowsToClear(MoveResult& result) -> void {
   for (size_t rowNum = 0; rowNum < ROWS; ++rowNum) {
     auto& row = board[rowNum];
     if (row.isFilled()) {
-      clearRow(rowNum);
-      ++rowsCleared;
+      result.addRowToClear(rowNum);
     }
   }
-  return rowsCleared;
 }
+
+template<size_t COLUMNS, size_t ROWS>
+auto Tetris<COLUMNS, ROWS>::clearRows(const std::array<size_t, 4> rows, size_t count) -> void {
+  if (count > 0) {
+    score.points += POINT_VALUES[count - 1];
+    score.clearedRows += count;
+    score.combos[count - 1] += 1;
+  }
+  for (int i = 0; i < count; ++i) {
+    clearRow(rows[i]);
+  }
+}
+
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::clearRow(size_t rowNum) -> void {
@@ -164,29 +193,6 @@ auto Tetris<COLUMNS, ROWS>::clearRow(size_t rowNum) -> void {
     --rowToDropNum;
   }
   board[0].clear();
-}
-
-template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> void {
-  if (gameOver) {
-    return;
-  }
-
-  auto isDrop = movement.y > 0;
-  auto didMove = false;
-  {
-    auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
-    if (canPlaceTetromino(currentTetromino, currentPosition + movement)) {
-      currentPosition += movement;
-      if (movement.y > 0) {
-        autoDropTimer.reset();
-      }
-      didMove = true;
-    }
-  }
-  if (!didMove && isDrop) {
-    nextTetromino();
-  }
 }
 
 template<size_t COLUMNS, size_t ROWS>
@@ -214,49 +220,40 @@ auto Tetris<COLUMNS, ROWS>::rotateTetrominoRight() -> void {
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::update() -> void {
-  if (!gameOver) {
-    autoDropTimer.update();
-  }
-}
-
-template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::draw(PixelList& ledChain) -> void {
   for (int row = 0; row < ROWS; ++row) {
     for (int col = 0; col < COLUMNS; ++col) {
       ledChain[((row * ROWS) + col)] = board[row][col];
     }
   }
-//  ledChain[((currentPosition.y * ROWS) + currentPosition.x)] = Color::WHITE();
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::autoFall() -> bool {
-  INFO("AutoDrop");
-  auto offset = Point {0, 1};
-  if (canPlaceTetrominoAtOffset(offset)) {
+auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> MoveResult {
+  if (gameOver) {
+    return {};
+  }
+
+  INFO("MOVE TETROMINO");
+  auto result = MoveResult{};
+  auto isDrop = movement.y > 0;
+  if (canPlaceCurrentTetrominoAtOffset(movement)) {
     auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
-    currentPosition += offset;
-    return true;
+    currentPosition += movement;
+    result.didMove = true;
   }
-  else {
-    nextTetromino();
-    return false;
+  if (!result.didMove && isDrop) {
+    result.nextTetromino = true;
+    calculateRowsToClear(result);
   }
+
+  return result;
 }
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::nextTetromino() -> void {
-  auto rowsCleared = clearRows();
-  if (rowsCleared > 0) {
-    score.points += POINT_VALUES[rowsCleared - 1];
-    score.clearedRows += rowsCleared;
-    score.combos[rowsCleared - 1] += 1;
-  }
-
   currentPosition = START_POSITION;
   currentTetromino = Tetromino::Random();
-  autoDropTimer.reset();
 
   if (!canPlaceTetromino(currentTetromino, currentPosition)) {
     for (auto& row : board) {
@@ -266,15 +263,16 @@ auto Tetris<COLUMNS, ROWS>::nextTetromino() -> void {
         }
       }
     }
-    INFO("GAMEOVER");
     gameOver = true;
   }
 
   placeCurrentTetromino();
+  INFO("Next Tetromino Complete");
 }
 
 template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::canPlaceTetrominoAtOffset(Point offset) -> bool {
+auto Tetris<COLUMNS, ROWS>::canPlaceCurrentTetrominoAtOffset(Point offset) -> bool {
+  INFO("CAN PLACE CURRENT AT OFFSET");
   auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
   auto pos = currentPosition + offset;
   return canPlaceTetromino(currentTetromino, pos);
@@ -286,6 +284,7 @@ auto Tetris<COLUMNS, ROWS>::placeTetromino(const Tetromino* tetromino, Point pos
     auto pos = position + offset;
     ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
     ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
+    INFO("Placing at %i, %i", pos.x, pos.y);
     board[pos.y][pos.x] = tetromino->color;
   }
 }
@@ -308,7 +307,7 @@ auto Tetris<COLUMNS, ROWS>::removeTetromino(const Tetromino* tetromino, Point po
     auto pos = position + offset;
     ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
     ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
-//    ASSERT(board[pos.y][pos.x] != Color::OFF(), "No tetromino found");
+    ASSERT(board[pos.y][pos.x] != Color::OFF(), "No tetromino found");
     board[pos.y][pos.x] = Color::OFF();
   }
 }
