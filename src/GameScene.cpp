@@ -56,7 +56,7 @@ auto GameScene::setup() -> void {
 
 auto GameScene::update() -> void {
   if (!inAnimation) {
-//    autoDropTimer.update();
+    autoDropTimer.update();
   }
 }
 
@@ -94,80 +94,39 @@ constexpr auto DESTROY_COLOR = Color(.8, .0, .2) * .03f;
 
 auto GameScene::runRowClearAnimation(MoveResult& result) -> void {
   INFO("Run Row Clear Animation");
-  auto x = std::make_unique<int>();
   inAnimation = true;
-  rowClearAnimationHandle = Timer::SetTimeout(
-    Duration::Milliseconds(0),
-    [&, result, frame = 0, phase = 1](TimerOptions& options) mutable {
-      INFO("Animation Frame");
-      if (phase == 0) {
-        if (frame == tetris.columnCount() / 2) {
-          phase = 1;
-          options.repeatIn = Duration::Microseconds(1);
-        }
-        else {
-          auto right = tetris.columnCount() / 2;
-          auto left= right - 1;
+  Timer::SetImmediateTimeout(
+    [&, result, frame = 0](TimerContext& context) mutable {
+      if (frame == tetris.columnCount() / 2) {
+        Timer::ContinuouslyFor(Duration::Milliseconds(200), [&, result](TimerContext& context) {
+          auto deathColor = DESTROY_COLOR.lerp(Color::OFF(), context.percentComplete);
           for (int i = 0; i < result.rowsCleared; ++i) {
             auto rowNum = result.rowNumbers[i];
-            tetris.board[rowNum][left - frame] = DESTROY_COLOR;
-            tetris.board[rowNum][right + frame] = DESTROY_COLOR;
+            for (int c = 0; c < tetris.columnCount(); ++c) {
+              tetris.board[rowNum][c] = deathColor;
+              tetris.board[rowNum][c] = deathColor;
+            }
           }
-          ++frame;
-          options.repeatIn = Duration::Milliseconds(80);
-        }
+
+          if (context.percentComplete >= 1.0f) {
+            tetris.clearRows(result.rowNumbers, result.rowsCleared);
+            tetris.nextTetromino();
+            autoDropTimer.reset();
+            inAnimation = false;
+            INFO("Row Clear Animation Done");
+          }
+        }).release();
       }
-//      else {
-//        constexpr static auto FADE_TIME = rgb::Duration::Milliseconds(300);
-//        auto time = (rgb::Clock::Now() % FADE_TIME).to<float>();
-//        auto amount = rgb::LerpWrap(0.0f, 1.0f, time / FADE_TIME.to<float>());
-//        auto deathColor = DESTROY_COLOR.lerp(Color::OFF(), amount);
-//        INFO("death color = %f, %f, %f, %f", deathColor.r, deathColor.g, deathColor.b, deathColor.w);
-//        for (int i = 0; i < result.rowsCleared; ++i) {
-//          auto rowNum = result.rowNumbers[i];
-//          for (int c = 0; c < tetris.columnCount(); ++c) {
-//            tetris.board[rowNum][c] = deathColor;
-//            tetris.board[rowNum][c] = deathColor;
-//          }
-//        }
-//
-//        if (deathColor.r < 0.003f) {
-//          tetris.clearRows(result.rowNumbers, result.rowsCleared);
-//          tetris.nextTetromino();
-//          autoDropTimer.reset();
-//          inAnimation = false;
-//          INFO("Row Clear Animation Done");
-//        }
-//        else {
-//          options.repeatIn = Duration::Microseconds(1);
-//        }
-//      }
       else {
-        constexpr static auto FADE_TIME = rgb::Duration::Milliseconds(50);
-        auto flash = DESTROY_COLOR;
-        flash.w = .35f;
-        auto time = (rgb::Clock::Now() % FADE_TIME).to<float>();
-        auto amount = rgb::LerpWrap(0.0f, 1.0f, time / FADE_TIME.to<float>());
-        auto deathColor = DESTROY_COLOR.lerp(flash, amount);
-        INFO("death color = %f, %f, %f, %f", deathColor.r, deathColor.g, deathColor.b, deathColor.w);
+        auto right = tetris.columnCount() / 2;
+        auto left= right - 1;
         for (int i = 0; i < result.rowsCleared; ++i) {
           auto rowNum = result.rowNumbers[i];
-          for (int c = 0; c < tetris.columnCount(); ++c) {
-            tetris.board[rowNum][c] = deathColor;
-            tetris.board[rowNum][c] = deathColor;
-          }
+          tetris.board[rowNum][left - frame] = DESTROY_COLOR;
+          tetris.board[rowNum][right + frame] = DESTROY_COLOR;
         }
-
-        if (deathColor.w >= .3f) {
-          tetris.clearRows(result.rowNumbers, result.rowsCleared);
-          tetris.nextTetromino();
-          autoDropTimer.reset();
-          inAnimation = false;
-          INFO("Row Clear Animation Done");
-        }
-        else {
-          options.repeatIn = Duration::Microseconds(1);
-        }
+        ++frame;
+        context.repeatIn = Duration::Milliseconds(60);
       }
-    });
+    }).release();
 }
