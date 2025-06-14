@@ -5,14 +5,19 @@
 #include "GameScene.h"
 #include "IRReceiver.h"
 #include "PixelSlice.h"
+#include "AdafruitI2CGamepad.h"
 
 using namespace rgb;
 
 auto irReceiver = IRReceiver{};
+auto gamepad = AdafruitI2CGamepad{};
 auto sensors = std::array {
   Runnable { []() {
     irReceiver.update();
   }},
+  Runnable { []() {
+    gamepad.update();
+  }}
 };
 
 auto grid = LEDMatrix<8, 8>(D2_RGB);
@@ -21,12 +26,13 @@ auto leds = std::array {
   static_cast<LEDCircuit*>(&grid)
 };
 
-auto gameScene = GameScene{grid, irReceiver};
+auto gameScene = GameScene{grid, irReceiver, gamepad};
 auto scenes = std::array {
   static_cast<Scene*>(&gameScene)
 };
 
 void setup() {
+  gamepad.start();
   irReceiver.start(D3);
   DebugScreen::Start(true);
   AppBuilder::Create()

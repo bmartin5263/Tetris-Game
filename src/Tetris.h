@@ -51,6 +51,7 @@ class Tetris {
 public:
   constexpr static auto SIZE = COLUMNS * ROWS;
   constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 0 };
+  constexpr static auto BOTTOM_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, ROWS - 1 };
   constexpr static auto POINT_VALUES = std::array { 100, 300, 1200, 3600 };
 
   using Point = rgb::Point;
@@ -80,20 +81,30 @@ public:
 private:
   const Tetromino* currentTetromino{&Tetromino::O};
   Point currentPosition{START_POSITION};
+  Point ghostPosition{START_POSITION};
   Score score{};
   bool gameOver{false};
+  bool ghostEnabled{true};
 
   auto placeCurrentTetromino() -> void {
     INFO("PLACE CURRENT TETROMINO");
+    if (ghostEnabled) {
+      placeTetromino(currentTetromino, ghostPosition, Color::WHITE(.01f));
+    }
     placeTetromino(currentTetromino, currentPosition);
   }
 
   auto removeCurrentTetromino() -> void {
     INFO("REMOVE CURRENT TETROMINO");
+    if (ghostEnabled) {
+      removeTetromino(currentTetromino, ghostPosition);
+    }
     removeTetromino(currentTetromino, currentPosition);
   }
 
+  auto calculateGhostPosition() -> Point;
   auto placeTetromino(const Tetromino* tetromino, Point position) -> void;
+  auto placeTetromino(const Tetromino* tetromino, Point position, Color color) -> void;
   auto removeTetromino(const Tetromino* tetromino, Point position) -> void;
   auto canPlaceTetromino(const Tetromino* tetromino, Point position) -> bool;
   auto canPlaceCurrentTetrominoAtOffset(Point offset) -> bool;
@@ -111,6 +122,16 @@ private:
     }
   };
 };
+
+template<size_t COLUMNS, size_t ROWS>
+auto Tetris<COLUMNS, ROWS>::calculateGhostPosition() -> Tetris::Point {
+  auto position = currentPosition;
+  position.y += 1;
+  while (canPlaceTetromino(currentTetromino, position) && position != BOTTOM_POSITION) {
+    position.y += 1;
+  }
+  return position - Point {0, 1};
+}
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::getScore() -> const Score& {
@@ -143,22 +164,22 @@ auto Tetris<COLUMNS, ROWS>::newGame() -> void {
   gameOver = false;
   nextTetromino();
 
-  auto off = Color::OFF();
-  auto red = Color::RED();
-  auto blu = Color::BLUE();
-  auto gre = Color::GREEN();
-  auto yel = Color::YELLOW();
-  board = {
-    Row<COLUMNS> {off, off, off, off, off, off, off, off},
-    Row<COLUMNS> {off, off, off, off, off, off, off, off},
-    Row<COLUMNS> {off, off, off, off, off, off, off, off},
-    Row<COLUMNS> {off, off, off, off, off, off, off, off},
-    Row<COLUMNS> {yel, yel, yel, yel, yel, off, yel, yel},
-    Row<COLUMNS> {blu, blu, blu, blu, blu, blu, blu, blu},
-    Row<COLUMNS> {gre, gre, gre, gre, gre, off, gre, gre},
-    Row<COLUMNS> {red, red, red, red, red, red, red, red}
-  };
-  placeCurrentTetromino();
+//  auto off = Color::OFF();
+//  auto red = Color::RED();
+//  auto blu = Color::BLUE();
+//  auto gre = Color::GREEN();
+//  auto yel = Color::YELLOW();
+//  board = {
+//    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {off, off, off, off, off, off, off, off},
+//    Row<COLUMNS> {yel, yel, yel, yel, yel, off, yel, yel},
+//    Row<COLUMNS> {blu, blu, blu, blu, blu, blu, blu, blu},
+//    Row<COLUMNS> {gre, gre, gre, gre, gre, off, gre, gre},
+//    Row<COLUMNS> {red, red, red, red, red, red, red, red}
+//  };
+//  placeCurrentTetromino();
 
 }
 
@@ -204,6 +225,7 @@ auto Tetris<COLUMNS, ROWS>::rotateTetrominoLeft() -> void {
   auto rotated = currentTetromino->leftRotation;
   if (canPlaceTetromino(rotated, currentPosition)) {
     currentTetromino = rotated;
+    ghostPosition = calculateGhostPosition();
   }
 }
 
@@ -216,6 +238,7 @@ auto Tetris<COLUMNS, ROWS>::rotateTetrominoRight() -> void {
   auto rotated = currentTetromino->rightRotation;
   if (canPlaceTetromino(rotated, currentPosition)) {
     currentTetromino = rotated;
+    ghostPosition = calculateGhostPosition();
   }
 }
 
@@ -240,6 +263,7 @@ auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> MoveResult {
   if (canPlaceCurrentTetrominoAtOffset(movement)) {
     auto pickUpCurrentTetromino = PickUpCurrentTetromino(*this);
     currentPosition += movement;
+    ghostPosition = calculateGhostPosition();
     result.didMove = true;
   }
   if (!result.didMove && isDrop) {
@@ -250,16 +274,19 @@ auto Tetris<COLUMNS, ROWS>::moveTetromino(Point movement) -> MoveResult {
   return result;
 }
 
+
+
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::nextTetromino() -> void {
   currentPosition = START_POSITION;
   currentTetromino = Tetromino::Random();
+  ghostPosition = calculateGhostPosition();
 
   if (!canPlaceTetromino(currentTetromino, currentPosition)) {
     for (auto& row : board) {
       for (auto& c : row) {
         if (c != Color::OFF()) {
-          c = Color::RED();
+          c = Color(.03f, .03f, .03f);
         }
       }
     }
@@ -290,6 +317,17 @@ auto Tetris<COLUMNS, ROWS>::placeTetromino(const Tetromino* tetromino, Point pos
 }
 
 template<size_t COLUMNS, size_t ROWS>
+auto Tetris<COLUMNS, ROWS>::placeTetromino(const Tetromino* tetromino, Point position, Color color) -> void {
+  for (auto& offset : tetromino->body) {
+    auto pos = position + offset;
+    ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
+    ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
+    INFO("Placing at %i, %i", pos.x, pos.y);
+    board[pos.y][pos.x] = color;
+  }
+}
+
+template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::canPlaceTetromino(const Tetromino* tetromino, Point position) -> bool {
   return std::all_of(tetromino->begin(), tetromino->end(), [&](auto offset){
     auto actualPosition = position + offset;
@@ -307,7 +345,7 @@ auto Tetris<COLUMNS, ROWS>::removeTetromino(const Tetromino* tetromino, Point po
     auto pos = position + offset;
     ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
     ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
-    ASSERT(board[pos.y][pos.x] != Color::OFF(), "No tetromino found");
+//    ASSERT(board[pos.y][pos.x] != Color::OFF(), "No tetromino found");
     board[pos.y][pos.x] = Color::OFF();
   }
 }
