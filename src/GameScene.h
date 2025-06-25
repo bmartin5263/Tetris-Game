@@ -11,6 +11,7 @@
 #include "Timer.h"
 #include "AdafruitI2CGamepad.h"
 #include "Trigger.h"
+#include "Config.h"
 
 namespace rgb {
 class IRReceiver;
@@ -23,7 +24,7 @@ class GameScene : public rgb::Scene {
 public:
   constexpr static auto SIZE = 8;
 
-  explicit GameScene(rgb::PixelList& grid, rgb::IRReceiver& irReceiver, rgb::AdafruitI2CGamepad& gamepad);
+  explicit GameScene(rgb::PixelGrid& grid, rgb::IRReceiver& irReceiver, rgb::AdafruitI2CGamepad& gamepad);
 
   auto update() -> void override;
   auto draw() -> void override;
@@ -36,13 +37,13 @@ private:
   auto processMoveResult(MoveResult& result) -> void;
   auto runRowClearAnimation(MoveResult& result) -> void;
 
-  Tetris<SIZE, SIZE> tetris{};
-  rgb::PixelList& grid;
+  Tetris<COLUMN_COUNT, ROW_COUNT> tetris{};
+  rgb::PixelGrid& grid;
   rgb::IRReceiver& irReceiver;
   rgb::AdafruitI2CGamepad& gamepad;
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
-//    auto result = tetris.moveTetromino({0, 1});
-//    processMoveResult(result);
+    auto result = tetris.movePiece({0, 1});
+    processMoveResult(result);
   }};
   rgb::TimerHandle rowClearAnimationHandle{};
   rgb::Trigger leftTrigger{[&](){

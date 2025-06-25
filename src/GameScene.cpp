@@ -10,33 +10,33 @@ using namespace rgb;
 
 #define TIMER_FUNCTION [](TimerResult& options)
 
-GameScene::GameScene(PixelList& grid, IRReceiver& irReceiver, AdafruitI2CGamepad& gamepad):
+GameScene::GameScene(PixelGrid& grid, IRReceiver& irReceiver, AdafruitI2CGamepad& gamepad):
   grid{grid}, irReceiver{irReceiver}, gamepad{gamepad} {
 }
 
 auto GameScene::setup() -> void {
   irReceiver.buttonLeft.onPress([this](){
     if (!inAnimation) {
-      tetris.moveTetromino(Point {-1, 0});
+      tetris.movePiece(Point {-1, 0});
     }
   });
 
   irReceiver.buttonRight.onPress([this](){
     if (!inAnimation) {
-      tetris.moveTetromino(Point{1, 0});
+      tetris.movePiece(Point{1, 0});
     }
   });
 
   irReceiver.buttonDown.onPress([this](){
     if (!inAnimation) {
-      auto result = tetris.moveTetromino(Point {0, 1});
+      auto result = tetris.movePiece(Point {0, 1});
       processMoveResult(result);
     }
   });
 
   irReceiver.buttonOk.onPress([this](){
     if (!inAnimation) {
-      tetris.rotateTetrominoRight();
+      tetris.rotatePieceRight();
     }
   });
 
@@ -46,7 +46,7 @@ auto GameScene::setup() -> void {
 
   irReceiver.button0.onPress([this](){
     if (!inAnimation) {
-      auto result = tetris.dropTetromino();
+      auto result = tetris.dropPiece();
       processMoveResult(result);
     }
   });
@@ -55,8 +55,8 @@ auto GameScene::setup() -> void {
     if (!inAnimation) {
       inAnimation = true;
       Timer::SetImmediateTimeout([&](auto& context){
-        auto result = tetris.moveTetromino(Point {0, 1});
-        if (result.nextTetromino) {
+        auto result = tetris.movePiece(Point {0, 1});
+        if (result.nextPiece) {
           inAnimation = false;
           processMoveResult(result);
         }
@@ -68,16 +68,21 @@ auto GameScene::setup() -> void {
   });
   gamepad.buttonA.onPress([this](){
     if (!inAnimation) {
-      tetris.rotateTetrominoRight();
+      tetris.rotatePieceRight();
     }
   });
   gamepad.buttonY.onPress([this](){
     if (!inAnimation) {
-      tetris.rotateTetrominoLeft();
+      tetris.rotatePieceLeft();
     }
   });
   gamepad.buttonSelect.onPress([this](){
-    newGame();
+    if (!inAnimation) {
+      newGame();
+    }
+  });
+  gamepad.buttonStart.onPress([this](){
+    tetris.toggleGhost();
   });
 
   INFO("NEW GAME");
@@ -87,17 +92,17 @@ auto GameScene::setup() -> void {
 auto GameScene::update() -> void {
   if (leftTrigger.test()) {
     if (!inAnimation) {
-      tetris.moveTetromino(Point {-1, 0});
+      tetris.movePiece(Point {-1, 0});
     }
   }
   if (rightTrigger.test()) {
     if (!inAnimation) {
-      tetris.moveTetromino(Point{1, 0});
+      tetris.movePiece(Point{1, 0});
     }
   }
   if (downTrigger.test()) {
     if (!inAnimation) {
-      auto result = tetris.moveTetromino(Point {0, 1});
+      auto result = tetris.movePiece(Point {0, 1});
       processMoveResult(result);
     }
   }
@@ -127,12 +132,12 @@ auto GameScene::newGame() -> void {
 
 auto GameScene::processMoveResult(MoveResult& result) -> void {
   autoDropTimer.reset();
-  if (result.nextTetromino) {
+  if (result.nextPiece) {
     if (result.rowsCleared > 0) {
       runRowClearAnimation(result);
     }
     else {
-      tetris.nextTetromino();
+      tetris.nextPiece();
     }
   }
 }
@@ -158,7 +163,7 @@ constexpr auto DESTROY_COLOR = Color(1.0f, 1.0f, 1.0f) * .03f;
 //
 //          if (context.percentComplete >= 1.0f) {
 //            tetris.clearRows(result.rowNumbers, result.rowsCleared);
-//            tetris.nextTetromino();
+//            tetris.nextPiece();
 //            autoDropTimer.reset();
 //            inAnimation = false;
 //            INFO("Row Clear Animation Done");
@@ -186,7 +191,7 @@ auto GameScene::runRowClearAnimation(MoveResult& result) -> void {
     [&, result, frame = 0](TimerContext& context) mutable {
       if (frame == tetris.columnCount()) {
         tetris.clearRows(result.rowNumbers, result.rowsCleared);
-        tetris.nextTetromino();
+        tetris.nextPiece();
         autoDropTimer.reset();
         inAnimation = false;
         INFO("Row Clear Animation Done");

@@ -11,7 +11,7 @@ struct MoveResult {
   size_t rowsCleared{0};
   std::array<size_t, 4> rowNumbers{};
   bool didMove{false};
-  bool nextTetromino{false};
+  bool nextPiece{false};
 
   auto addRowToClear(size_t rowNum) {
     rowNumbers[rowsCleared++] = rowNum;

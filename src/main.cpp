@@ -6,6 +6,7 @@
 #include "IRReceiver.h"
 #include "PixelSlice.h"
 #include "AdafruitI2CGamepad.h"
+#include "Config.h"
 
 using namespace rgb;
 
@@ -20,7 +21,7 @@ auto sensors = std::array {
   }}
 };
 
-auto grid = LEDMatrix<8, 8>(D2_RGB);
+auto grid = LEDMatrix<COLUMN_COUNT, ROW_COUNT>(D2_RGB);
 auto debugLeds = grid.slice(8);
 auto leds = std::array {
   static_cast<LEDCircuit*>(&grid)
