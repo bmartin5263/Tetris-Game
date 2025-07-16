@@ -11,6 +11,12 @@ struct Score {
   unsigned int clearedRows{};
   unsigned int points{};
   std::array<unsigned int, 4> combos{};
+
+  auto reset() {
+    clearedRows = 0;
+    points = 0;
+    combos.fill(0);
+  }
 };
 
 #endif //TETRISGAME_SCORE_H

@@ -9,19 +9,18 @@
 #include <utility>
 #include <unordered_map>
 #include "Point.h"
-#include "Color.h"
+#include "PieceType.h"
 
 class Piece {
   using Point = rgb::Point;
-  using Color = rgb::Color;
 
-  Piece(Color color, std::array<Point, 4> body, const Piece* leftRotation, const Piece* rightRotation);
+  Piece(PieceType type, std::array<Point, 4> body, const Piece* leftRotation, const Piece* rightRotation);
 
 public:
   auto begin() const -> const Point* { return body.begin(); }
   auto end() const -> const Point* { return body.end(); }
 
-  const Color color;
+  const PieceType type;
   const std::array<Point, 4> body;
   const Piece* const leftRotation;
   const Piece* const rightRotation;

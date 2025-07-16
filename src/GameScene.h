@@ -20,11 +20,12 @@ class IRReceiver;
 class GameScene : public rgb::Scene {
   using Every = rgb::Every;
   using Duration = rgb::Duration;
+  using Color = rgb::Color;
 
 public:
-  constexpr static auto SIZE = 8;
+  static constexpr auto DESTROY_COLOR = Color::OFF();
 
-  explicit GameScene(rgb::PixelGrid& grid, rgb::IRReceiver& irReceiver, rgb::AdafruitI2CGamepad& gamepad);
+  explicit GameScene(rgb::PixelGrid& grid, rgb::IRReceiver& irReceiver, AdafruitI2CGamepad& gamepad);
 
   auto update() -> void override;
   auto draw() -> void override;
@@ -37,10 +38,13 @@ private:
   auto processMoveResult(MoveResult& result) -> void;
   auto runRowClearAnimation(MoveResult& result) -> void;
 
+  auto setupIRReceiver() -> void;
+  auto setupGamepad() -> void;
+
   Tetris<COLUMN_COUNT, ROW_COUNT> tetris{};
   rgb::PixelGrid& grid;
   rgb::IRReceiver& irReceiver;
-  rgb::AdafruitI2CGamepad& gamepad;
+  AdafruitI2CGamepad& gamepad;
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
     auto result = tetris.movePiece({0, 1});
     processMoveResult(result);
