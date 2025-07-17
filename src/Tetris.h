@@ -15,7 +15,10 @@
 #include "MoveResult.h"
 #include "Iterable.h"
 
-using Cell = PieceType;
+struct Cell {
+  PieceType type{PieceType::EMPTY};
+  bool destroying{false};
+};
 
 template<size_t COLUMNS>
 struct Row {
@@ -34,12 +37,12 @@ struct Row {
   }
 
   auto isFilled() -> bool {
-    auto isNotOff = [](auto& c) { return c != PieceType::EMPTY; };
-    return std::all_of(data.begin(), data.end(), isNotOff);
+    auto isNotEmpty = [](const Cell& c) { return c.type != PieceType::EMPTY; };
+    return std::all_of(data.begin(), data.end(), isNotEmpty);
   }
 
   auto clear() -> void {
-    data.fill(PieceType::EMPTY);
+    data.fill(Cell{});
   }
 };
 
@@ -48,7 +51,7 @@ class Tetris {
   using Point = rgb::Point;
   using PixelGrid = rgb::PixelGrid;
   using Board = std::array<Row<COLUMNS>, ROWS>;
-  using Color = rgb::Color; // TODO - move out of Tetris.h
+  using Timestamp = rgb::Timestamp;
   template<typename T>
   using Iterable = rgb::Iterable<T>;
 
@@ -57,9 +60,6 @@ public:
   constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 1 };
   constexpr static auto BOTTOM_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, ROWS - 1 };
   constexpr static auto POINT_VALUES = std::array { 100, 300, 1200, 3600 };
-  constexpr static auto GHOST_COLOR = rgb::Color(0.0f, 0.0f, 0.0f, .01f);
-
-  auto draw(PixelGrid& pixelGrid) -> void;
 
   // Initializes a new game
   auto newGame() -> void;
@@ -73,20 +73,22 @@ public:
   auto rotatePieceRight() -> void;
   auto getScore() -> const Score&;
   auto toggleGhost() -> void;
+  constexpr auto isGameOver() -> bool;
 
   auto columnCount() -> size_t { return COLUMNS; }
 
+
   Board board{PieceType::EMPTY};
 private:
-  bool ghostEnabled{false};
   const Piece* currentPiece{&Piece::O};
   Point currentPosition{START_POSITION};
   Point ghostPosition{START_POSITION};
   Score score{};
   bool gameOver{false};
+  bool ghostEnabled{false};
 
   auto placeCurrentPiece() -> void {
-    INFO("PLACE CURRENT TETROMINO");
+    TRACE("PLACE CURRENT TETROMINO");
     if (ghostEnabled) {
       placePiece(currentPiece, ghostPosition, PieceType::GHOST);
     }
@@ -94,7 +96,7 @@ private:
   }
 
   auto removeCurrentPiece() -> void {
-    INFO("REMOVE CURRENT TETROMINO");
+    TRACE("REMOVE CURRENT TETROMINO");
     if (ghostEnabled) {
       removePiece(currentPiece, ghostPosition);
     }
@@ -123,9 +125,15 @@ private:
 };
 
 template<size_t COLUMNS, size_t ROWS>
+constexpr auto Tetris<COLUMNS, ROWS>::isGameOver() -> bool {
+  return gameOver;
+}
+
+template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::toggleGhost() -> void {
   ghostEnabled = !ghostEnabled;
   if (ghostEnabled) {
+    // TODO buggy code
     removePiece(currentPiece, currentPosition);
     placePiece(currentPiece, ghostPosition, PieceType::GHOST);
     placePiece(currentPiece, currentPosition);
@@ -139,7 +147,6 @@ auto Tetris<COLUMNS, ROWS>::toggleGhost() -> void {
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::calculateGhostPosition() -> Tetris::Point {
   auto position = currentPosition;
-  position.y += 1;
   while (canPlacePiece(currentPiece, position)) {
     position.y += 1;
   }
@@ -169,9 +176,9 @@ auto Tetris<COLUMNS, ROWS>::dropPiece() -> MoveResult {
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::newGame() -> void {
-  INFO("NEW GAME");
+  TRACE("NEW GAME");
   std::for_each(board.begin(), board.end(), [](auto& row) {
-    std::fill(row.begin(), row.end(), PieceType::EMPTY);
+    row.clear();
   });
 
   score.reset();
@@ -256,48 +263,13 @@ auto Tetris<COLUMNS, ROWS>::rotatePieceRight() -> void {
   }
 }
 
-static constexpr auto mapToColor(PieceType piece) {
-  switch (piece) {
-    case PieceType::EMPTY:
-      return rgb::Color::OFF();
-    case PieceType::GHOST:
-      return rgb::Color(0.0f, 0.0f, 0.0f, .01f);
-    case PieceType::GAMEOVER:
-      return rgb::Color(.03f, .03f, .03f);
-    case PieceType::O:
-      return rgb::Color::YELLOW(.02f);
-    case PieceType::J:
-      return rgb::Color::BLUE(.02f);
-    case PieceType::L:
-      return rgb::Color::ORANGE(.02f);
-    case PieceType::T:
-      return rgb::Color::CYAN(.02f);
-    case PieceType::Z:
-      return rgb::Color::GREEN(.02f);
-    case PieceType::S:
-      return rgb::Color::MAGENTA(.02f);
-    case PieceType::I:
-      return rgb::Color::RED(.02f);
-  }
-  return rgb::Color::OFF();
-}
-
-template<size_t COLUMNS, size_t ROWS>
-auto Tetris<COLUMNS, ROWS>::draw(PixelGrid& pixelGrid) -> void {
-  for (int row = 0; row < ROWS; ++row) {
-    for (int col = 0; col < COLUMNS; ++col) {
-      pixelGrid[Point{col, row}] = mapToColor(board[row][col]);
-    }
-  }
-}
-
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::movePiece(Point movement) -> MoveResult {
   if (gameOver) {
     return {};
   }
 
-  INFO("MOVE TETROMINO");
+  TRACE("MOVE TETROMINO");
   auto result = MoveResult{};
   auto isDrop = movement.y > 0;
   if (canPlaceCurrentPieceAtOffset(movement)) {
@@ -325,24 +297,17 @@ auto Tetris<COLUMNS, ROWS>::nextPiece() -> void {
   if (!canPlacePiece(currentPiece, currentPosition)) {
     currentPosition.y -= 1;
     if (!canPlacePiece(currentPiece, currentPosition)) {
-      for (auto& row : board) {
-        for (auto& c : row) {
-          if (c != PieceType::EMPTY) {
-            c = PieceType::GAMEOVER;
-          }
-        }
-      }
       gameOver = true;
     }
   }
 
   placeCurrentPiece();
-  INFO("Next Piece Complete");
+  TRACE("Next Piece Complete");
 }
 
 template<size_t COLUMNS, size_t ROWS>
 auto Tetris<COLUMNS, ROWS>::canPlaceCurrentPieceAtOffset(Point offset) -> bool {
-  INFO("CAN PLACE CURRENT AT OFFSET");
+  TRACE("CAN PLACE CURRENT AT OFFSET");
   auto pickUpCurrentPiece = PickUpCurrentPiece(*this);
   auto pos = currentPosition + offset;
   return canPlacePiece(currentPiece, pos);
@@ -359,8 +324,8 @@ auto Tetris<COLUMNS, ROWS>::placePiece(const Piece* piece, Point position, Piece
     auto pos = position + offset;
     ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
     ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
-    INFO("Placing at %i, %i", pos.x, pos.y);
-    board[pos.y][pos.x] = pieceType;
+    TRACE("Placing at %i, %i", pos.x, pos.y);
+    board[pos.y][pos.x].type = pieceType;
   }
 }
 
@@ -372,7 +337,7 @@ auto Tetris<COLUMNS, ROWS>::canPlacePiece(const Piece* piece, Point position) ->
         && actualPosition.x < COLUMNS
         && actualPosition.y >= 0
         && actualPosition.y < ROWS
-        && board[actualPosition.y][actualPosition.x] == PieceType::EMPTY;
+        && board[actualPosition.y][actualPosition.x].type == PieceType::EMPTY;
   });
 }
 
@@ -382,7 +347,7 @@ auto Tetris<COLUMNS, ROWS>::removePiece(const Piece* piece, Point position) -> v
     auto pos = position + offset;
     ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
     ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
-    board[pos.y][pos.x] = PieceType::EMPTY;
+    board[pos.y][pos.x].type = PieceType::EMPTY;
   }
 }
 

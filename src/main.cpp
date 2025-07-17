@@ -35,7 +35,7 @@ auto scenes = std::array {
 void setup() {
   gamepad.start();
   irReceiver.start(D3);
-  DebugScreen::Start(true);
+  DebugScreen::Start(FlipDisplay{true});
   AppBuilder::Create()
       .SetScenes(scenes)
       .SetLEDs(leds)
