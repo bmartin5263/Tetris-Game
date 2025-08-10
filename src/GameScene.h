@@ -12,6 +12,7 @@
 #include "AdafruitI2CGamepad.h"
 #include "Trigger.h"
 #include "Config.h"
+#include "Config.h"
 
 namespace rgb {
 class IRReceiver;
@@ -28,7 +29,11 @@ public:
   static constexpr auto GAME_OVER_COLOR = Color::WHITE(.01f);
   constexpr static auto GHOST_COLOR = Color::WHITE(.01f);
 
-  explicit GameScene(rgb::PixelGrid& grid, rgb::IRReceiver& irReceiver, AdafruitI2CGamepad& gamepad);
+  explicit GameScene(
+    rgb::PixelGrid& grid,
+    rgb::IRReceiver& irReceiver,
+    AdafruitI2CGamepad& gamepad
+  );
 
   auto update() -> void override;
   auto draw() -> void override;
@@ -45,7 +50,7 @@ private:
   auto setupIRReceiver() -> void;
   auto setupGamepad() -> void;
 
-  auto mapToColor(Cell cell) {
+  auto mapToColor(Cell cell) -> Color {
     Color color = Color::OFF();
 
     if (cell.destroying) {
@@ -54,6 +59,12 @@ private:
 
     auto speed = Duration::Milliseconds(600);
     auto time = rgb::Clock::Now().mod(speed).to<float>() / speed.to<float>();
+
+    if (rainbowing && cell.type != PieceType::EMPTY) {
+      color = Color::HslToRgb(time);
+      return color;
+    }
+
     switch (cell.type) {
       case PieceType::EMPTY:
         break;
@@ -101,6 +112,8 @@ private:
     processMoveResult(result);
   }};
   rgb::TimerHandle rowClearAnimationHandle{};
+  rgb::TimerHandle dropTimerHandle{};
+  rgb::TimerHandle rainbowTimerHandle{};
   rgb::Trigger leftTrigger{[&](){
     return gamepad.analogX <= .03f;
   }};
@@ -111,6 +124,8 @@ private:
     return gamepad.analogY <= .03f;
   }};
   bool inAnimation{false};
+  bool dropping{false};
+  bool rainbowing{false};
 };
 
 

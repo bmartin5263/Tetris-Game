@@ -6,6 +6,7 @@
 #include "IRReceiver.h"
 #include "DebugScreen.h"
 #include "Wireless.h"
+#include "Assertions.h"
 
 using namespace rgb;
 
@@ -32,7 +33,7 @@ auto GameScene::update() -> void {
     }
   }
   if (downTrigger.test()) {
-    if (!inAnimation) {
+    if (!inAnimation && !dropping) {
       auto result = tetris.movePiece(Point {0, 1});
       processMoveResult(result);
     }
@@ -45,9 +46,53 @@ auto GameScene::update() -> void {
 
 auto GameScene::draw() -> void {
   using std::to_string;
+  auto middleCol = COLUMN_COUNT / 2;
+  auto middleRow = ROW_COUNT / 2;
+//  for (int gameRow = 0; gameRow < ROW_COUNT; ++gameRow) {
+//    for (int gameCol = 0; gameCol < COLUMN_COUNT; ++gameCol) {
+//      auto color = mapToColor(tetris.board[gameRow][gameCol]);
+//      grid[{gameCol, gameRow}] = color;
+//    }
+//    for (int gameCol = middleCol; gameCol < COLUMN_COUNT; ++gameCol) {
+//      auto color = mapToColor(tetris.board[gameRow][gameCol]);
+//
+//      int physicalRow = middleRow + gameRow;
+//      int physicalCol = gameCol - COLUMN_COUNT;
+//
+//      grid[{physicalRow, physicalCol}] = color;
+//    }
+//  }
+//  grid[{0, 0}] = Color::BLUE(.01f);
+//  grid[{ROW_COUNT - 1, COLUMN_COUNT - 1}] = Color::RED(.01f);
+
   for (int row = 0; row < ROW_COUNT; ++row) {
     for (int col = 0; col < COLUMN_COUNT; ++col) {
-      grid[Point{col, row}] = mapToColor(tetris.board[row][col]);
+      auto color = mapToColor(tetris.board[row][col]);
+      if (col < middleCol) {
+        u16 position = (middleCol * row) + col;
+        ASSERT(position < 128, "position too big");
+        static_cast<PixelList&>(grid)[position] = color;
+      }
+      else {
+        // Row = 0
+        // Col = 8
+        // Exp = 128
+        // 32 rows, 8 columns, we want to be in row 16, column 0
+
+        // Row = 0
+        // Col = 9
+        // Exp = 129
+        // 32 rows, 8 columns, we want to be in row 16, column 1
+
+        u16 position = ((row + ROW_COUNT) * middleCol) + (col - middleCol);
+        ASSERT(position >= 128, "position too small");
+        static_cast<PixelList&>(grid)[position] = color;
+      }
+
+//      auto v = static_cast<float>((row * ROW_COUNT) + col);
+//      auto h = v / (ROW_COUNT * COLUMN_COUNT);
+//      auto c = Color::HslToRgb(h);
+//      grid[Point{col, row}] = c * .03f;
     }
   }
 
@@ -69,6 +114,7 @@ auto GameScene::draw() -> void {
   DebugScreen::PrintLine(0, "Points: " + to_string(tetris.getScore().points));
   DebugScreen::PrintLine(1, "Rows: " + to_string(tetris.getScore().clearedRows));
   DebugScreen::PrintLine(2, "Time: " + minutesStr + ":" + secondsStr);
+  DebugScreen::PrintLine(3, std::string("Dropping: ") + (dropping ? "true" : "false"));
   DebugScreen::PrintLine(4, "FPS: " + to_string(Clock::Fps()));
 }
 
@@ -81,6 +127,8 @@ auto GameScene::newGame() -> void {
   gameEndAt = Timestamp{};
   tetris.newGame();
   autoDropTimer.reset();
+  dropTimerHandle.cancel();
+  rainbowing = false;
 }
 
 auto GameScene::processMoveResult(MoveResult& result) -> void {
@@ -110,6 +158,10 @@ auto GameScene::runRowClearAnimation(MoveResult& result) -> void {
         autoDropTimer.reset();
         inAnimation = false;
         INFO("Row Clear Animation Done");
+        if (result.rowsCleared == 4) {
+          rainbowing = true;
+          rainbowTimerHandle = Timer::SetTimeout(Duration::Seconds(3), [&](){ rainbowing = false; });
+        }
       }
       else {
         for (int i = 0; i < result.rowsCleared; ++i) {
@@ -193,18 +245,22 @@ auto GameScene::setupIRReceiver() -> void {
 
 auto GameScene::setupGamepad() -> void {
   gamepad.buttonB.onPress([this](){
-    if (!inAnimation && !tetris.isGameOver()) {
-      inAnimation = true;
-      Timer::SetImmediateTimeout([&](auto& context){
+    if (dropping) {
+      dropTimerHandle.cancel();
+      dropping = false;
+    }
+    else if (!tetris.isGameOver()) {
+      dropping = true;
+      dropTimerHandle = Timer::SetImmediateTimeout([&](auto& context){
         auto result = tetris.movePiece(Point {0, 1});
         if (result.nextPiece) {
-          inAnimation = false;
+          dropping = false;
           processMoveResult(result);
         }
         else {
           context.repeatIn = Duration::Milliseconds(5);
         }
-      }).detach();
+      });
     }
   });
   gamepad.buttonA.onPress([this](){

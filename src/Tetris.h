@@ -57,7 +57,8 @@ class Tetris {
 
 public:
   constexpr static auto SIZE = COLUMNS * ROWS;
-  constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 1 };
+//  constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 1 };
+  constexpr static auto START_POSITION = rgb::Point { 2, 1 };
   constexpr static auto BOTTOM_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, ROWS - 1 };
   constexpr static auto POINT_VALUES = std::array { 100, 300, 1200, 3600 };
 
