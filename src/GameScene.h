@@ -9,14 +9,14 @@
 #include "PixelList.h"
 #include "Tetris.h"
 #include "Timer.h"
-#include "AdafruitI2CGamepad.h"
 #include "Trigger.h"
-#include "Config.h"
 #include "Config.h"
 
 namespace rgb {
 class IRReceiver;
+class MAX7219EightDigitSevenSegmentDisplay;
 }
+class AdafruitI2CGamepad;
 
 class GameScene : public rgb::Scene {
   using Every = rgb::Every;
@@ -29,10 +29,10 @@ public:
   static constexpr auto GAME_OVER_COLOR = Color::WHITE(.01f);
   constexpr static auto GHOST_COLOR = Color::WHITE(.01f);
 
-  explicit GameScene(
+  GameScene(
     rgb::PixelGrid& grid,
-    rgb::IRReceiver& irReceiver,
-    AdafruitI2CGamepad& gamepad
+    AdafruitI2CGamepad& gamepad,
+    rgb::MAX7219EightDigitSevenSegmentDisplay& sevenSegDisplay
   );
 
   auto update() -> void override;
@@ -47,7 +47,6 @@ private:
   auto runRowClearAnimation(MoveResult& result) -> void;
   auto runGameOverAnimation() -> void;
 
-  auto setupIRReceiver() -> void;
   auto setupGamepad() -> void;
 
   auto mapToColor(Cell cell) -> Color {
@@ -105,8 +104,8 @@ private:
   Timestamp gameEndAt{};
   Tetris<COLUMN_COUNT, ROW_COUNT> tetris{};
   rgb::PixelGrid& grid;
-  rgb::IRReceiver& irReceiver;
   AdafruitI2CGamepad& gamepad;
+  rgb::MAX7219EightDigitSevenSegmentDisplay& sevenSegDisplay;
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
     auto result = tetris.movePiece({0, 1});
     processMoveResult(result);
@@ -114,15 +113,9 @@ private:
   rgb::TimerHandle rowClearAnimationHandle{};
   rgb::TimerHandle dropTimerHandle{};
   rgb::TimerHandle rainbowTimerHandle{};
-  rgb::Trigger leftTrigger{[&](){
-    return gamepad.analogX <= .03f;
-  }};
-  rgb::Trigger rightTrigger{[&](){
-    return gamepad.analogX >= .97f;
-  }};
-  rgb::Trigger downTrigger{[&](){
-    return gamepad.analogY <= .03f;
-  }};
+  rgb::Trigger leftTrigger;
+  rgb::Trigger rightTrigger;
+  rgb::Trigger downTrigger;
   bool inAnimation{false};
   bool dropping{false};
   bool rainbowing{false};

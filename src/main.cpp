@@ -7,15 +7,13 @@
 #include "PixelSlice.h"
 #include "AdafruitI2CGamepad.h"
 #include "Config.h"
+#include "SevenSegmentDisplay.h"
 
 using namespace rgb;
 
-auto irReceiver = IRReceiver{};
+auto sevenSegDisplay = MAX7219EightDigitSevenSegmentDisplay{D5};
 auto gamepad = AdafruitI2CGamepad{};
 auto sensors = std::array {
-  Runnable { []() {
-    irReceiver.update();
-  }},
   Runnable { []() {
     gamepad.update();
   }}
@@ -27,15 +25,17 @@ auto leds = std::array {
   static_cast<LEDCircuit*>(&grid)
 };
 
-auto gameScene = GameScene{grid, irReceiver, gamepad};
+auto gameScene = GameScene{grid, gamepad, sevenSegDisplay};
 auto scenes = std::array {
   static_cast<Scene*>(&gameScene)
 };
 
 void setup() {
+  SPI.begin();
+  sevenSegDisplay.start();
+
   gamepad.start();
-  irReceiver.start(D3);
-  DebugScreen::Start(FlipDisplay{true});
+//  DebugScreen::Start(FlipDisplay{true});
   AppBuilder::Create()
       .SetScenes(scenes)
       .SetLEDs(leds)
@@ -45,8 +45,8 @@ void setup() {
 }
 
 void loop() {
-  if (DebugScreen::ReadyForUpdate()) {
-    DebugScreen::Display();
-  }
+//  if (DebugScreen::ReadyForUpdate()) {
+//    DebugScreen::Display();
+//  }
   App::Loop();
 }

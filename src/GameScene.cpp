@@ -3,19 +3,33 @@
 //
 
 #include "GameScene.h"
-#include "IRReceiver.h"
 #include "DebugScreen.h"
 #include "Wireless.h"
 #include "Assertions.h"
+#include "SevenSegmentDisplay.h"
+#include "AdafruitI2CGamepad.h"
 
 using namespace rgb;
 
-GameScene::GameScene(PixelGrid& grid, IRReceiver& irReceiver, AdafruitI2CGamepad& gamepad):
-  grid{grid}, irReceiver{irReceiver}, gamepad{gamepad} {
+GameScene::GameScene(
+  PixelGrid& grid,
+  AdafruitI2CGamepad& gamepad,
+  rgb::MAX7219EightDigitSevenSegmentDisplay& sevenSegDisplay
+):
+  grid{grid}, gamepad{gamepad}, sevenSegDisplay(sevenSegDisplay),
+  leftTrigger{[&](){
+    return gamepad.analogX <= .03f;
+  }},
+  rightTrigger{[&](){
+    return gamepad.analogX >= .97f;
+  }},
+  downTrigger{[&](){
+    return gamepad.analogY <= .03f;
+  }}
+  {
 }
 
 auto GameScene::setup() -> void {
-  setupIRReceiver();
   setupGamepad();
   INFO("NEW GAME");
   newGame();
@@ -111,11 +125,14 @@ auto GameScene::draw() -> void {
   auto minutesStr = minutes >= 10 ? to_string(minutes) : "0" + to_string(minutes);
   auto secondsStr = seconds >= 10 ? to_string(seconds) : "0" + to_string(seconds);
 
-  DebugScreen::PrintLine(0, "Points: " + to_string(tetris.getScore().points));
-  DebugScreen::PrintLine(1, "Rows: " + to_string(tetris.getScore().clearedRows));
-  DebugScreen::PrintLine(2, "Time: " + minutesStr + ":" + secondsStr);
-  DebugScreen::PrintLine(3, std::string("Dropping: ") + (dropping ? "true" : "false"));
-  DebugScreen::PrintLine(4, "FPS: " + to_string(Clock::Fps()));
+//  DebugScreen::PrintLine(0, "Points: " + to_string(tetris.getScore().points));
+//  DebugScreen::PrintLine(1, "Rows: " + to_string(tetris.getScore().clearedRows));
+//  DebugScreen::PrintLine(2, "Time: " + minutesStr + ":" + secondsStr);
+//  DebugScreen::PrintLine(3, std::string("Dropping: ") + (dropping ? "true" : "false"));
+//  DebugScreen::PrintLine(4, "FPS: " + to_string(Clock::Fps()));
+
+  sevenSegDisplay.clear();
+  sevenSegDisplay.writeNumber(12345, 0, SevenSegmentDigit::_0);
 }
 
 auto GameScene::cleanup() -> void {
@@ -203,44 +220,6 @@ auto GameScene::runGameOverAnimation() -> void {
         inAnimation = false;
       }
     }).detach();
-}
-
-auto GameScene::setupIRReceiver() -> void {
-  irReceiver.buttonLeft.onPress([this](){
-    if (!inAnimation) {
-      tetris.movePiece(Point {-1, 0});
-    }
-  });
-
-  irReceiver.buttonRight.onPress([this](){
-    if (!inAnimation) {
-      tetris.movePiece(Point{1, 0});
-    }
-  });
-
-  irReceiver.buttonDown.onPress([this](){
-    if (!inAnimation) {
-      auto result = tetris.movePiece(Point {0, 1});
-      processMoveResult(result);
-    }
-  });
-
-  irReceiver.buttonOk.onPress([this](){
-    if (!inAnimation) {
-      tetris.rotatePieceRight();
-    }
-  });
-
-  irReceiver.buttonStar.onPress([this](){
-    newGame();
-  });
-
-  irReceiver.button0.onPress([this](){
-    if (!inAnimation) {
-      auto result = tetris.dropPiece();
-      processMoveResult(result);
-    }
-  });
 }
 
 auto GameScene::setupGamepad() -> void {
