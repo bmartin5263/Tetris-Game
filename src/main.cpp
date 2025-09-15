@@ -19,7 +19,7 @@ auto sensors = std::array {
   }}
 };
 
-auto grid = LEDMatrix<COLUMN_COUNT, ROW_COUNT>(D2_RGB);
+auto grid = LEDMatrix<DISPLAY_COLUMN_COUNT, ROW_COUNT>(D2_RGB);
 auto debugLeds = grid.slice(8);
 auto leds = std::array {
   static_cast<LEDCircuit*>(&grid)

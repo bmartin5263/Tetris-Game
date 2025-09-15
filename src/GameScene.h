@@ -73,6 +73,15 @@ private:
       case PieceType::GAMEOVER:
         color = Color::RED(.04).lerpWrap(Color::RED(.005), time);
         break;
+      default:
+        color = mapToColor(cell.type);
+    }
+    return color;
+  }
+
+  static auto mapToColor(PieceType type) -> Color {
+    Color color = Color::OFF();
+    switch (type) {
       case PieceType::O:
         color += Color::YELLOW(.02f);
         break;
@@ -102,7 +111,7 @@ private:
 
   Timestamp gameStartAt{};
   Timestamp gameEndAt{};
-  Tetris<COLUMN_COUNT, ROW_COUNT> tetris{};
+  Tetris<GAME_COLUMN_COUNT, ROW_COUNT> tetris{};
   rgb::PixelGrid& grid;
   AdafruitI2CGamepad& gamepad;
   rgb::MAX7219EightDigitSevenSegmentDisplay& sevenSegDisplay;

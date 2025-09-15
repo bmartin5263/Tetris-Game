@@ -60,53 +60,34 @@ auto GameScene::update() -> void {
 
 auto GameScene::draw() -> void {
   using std::to_string;
-  auto middleCol = COLUMN_COUNT / 2;
-  auto middleRow = ROW_COUNT / 2;
-//  for (int gameRow = 0; gameRow < ROW_COUNT; ++gameRow) {
-//    for (int gameCol = 0; gameCol < COLUMN_COUNT; ++gameCol) {
-//      auto color = mapToColor(tetris.board[gameRow][gameCol]);
-//      grid[{gameCol, gameRow}] = color;
-//    }
-//    for (int gameCol = middleCol; gameCol < COLUMN_COUNT; ++gameCol) {
-//      auto color = mapToColor(tetris.board[gameRow][gameCol]);
-//
-//      int physicalRow = middleRow + gameRow;
-//      int physicalCol = gameCol - COLUMN_COUNT;
-//
-//      grid[{physicalRow, physicalCol}] = color;
-//    }
-//  }
-//  grid[{0, 0}] = Color::BLUE(.01f);
-//  grid[{ROW_COUNT - 1, COLUMN_COUNT - 1}] = Color::RED(.01f);
+  auto middleCol = DISPLAY_COLUMN_COUNT / 2;
 
   for (int row = 0; row < ROW_COUNT; ++row) {
-    for (int col = 0; col < COLUMN_COUNT; ++col) {
+    for (int col = 0; col < GAME_COLUMN_COUNT; ++col) {
       auto color = mapToColor(tetris.board[row][col]);
-      if (col < middleCol) {
-        u16 position = (middleCol * row) + col;
-        ASSERT(position < 128, "position too big");
+      auto dCol = col + 3;
+      if (dCol < middleCol) {
+        u16 position = (middleCol * row) + dCol;
+//        ASSERT(position < ROW_COUNT * COLUMN_COUNT / 2, "position too big");
         static_cast<PixelList&>(grid)[position] = color;
       }
       else {
-        // Row = 0
-        // Col = 8
-        // Exp = 128
-        // 32 rows, 8 columns, we want to be in row 16, column 0
-
-        // Row = 0
-        // Col = 9
-        // Exp = 129
-        // 32 rows, 8 columns, we want to be in row 16, column 1
-
-        u16 position = ((row + ROW_COUNT) * middleCol) + (col - middleCol);
-        ASSERT(position >= 128, "position too small");
+        u16 position = ((row + ROW_COUNT) * middleCol) + (dCol - middleCol);
+//        ASSERT(position >= 128, "position too small");
         static_cast<PixelList&>(grid)[position] = color;
       }
+    }
+  }
 
-//      auto v = static_cast<float>((row * ROW_COUNT) + col);
-//      auto h = v / (ROW_COUNT * COLUMN_COUNT);
-//      auto c = Color::HslToRgb(h);
-//      grid[Point{col, row}] = c * .03f;
+  auto color = mapToColor(tetris.currentPiece->type);
+  for (int row = 0; row < ROW_COUNT; ++row) {
+    for (int col = 0; col < 3; ++col) {
+      u16 position = (middleCol * row) + col;
+      static_cast<PixelList&>(grid)[position] = color;
+    }
+    for (int col = 13; col < 16; ++col) {
+      u16 position = ((row + ROW_COUNT) * middleCol) + (col - middleCol);
+      static_cast<PixelList&>(grid)[position] = color;
     }
   }
 
@@ -132,7 +113,7 @@ auto GameScene::draw() -> void {
 //  DebugScreen::PrintLine(4, "FPS: " + to_string(Clock::Fps()));
 
   sevenSegDisplay.clear();
-  sevenSegDisplay.writeNumber(12345, 0, SevenSegmentDigit::_0);
+  sevenSegDisplay.writeNumber(tetris.getScore().points, 0, SevenSegmentDigit::_0);
 }
 
 auto GameScene::cleanup() -> void {
@@ -201,7 +182,7 @@ auto GameScene::runGameOverAnimation() -> void {
     [&](TimerContext& context) mutable {
       bool found = false;
       for (int row = ROW_COUNT - 1; row >= 0; --row) {
-        for (int col = 0; col < COLUMN_COUNT; ++col) {
+        for (int col = 0; col < GAME_COLUMN_COUNT; ++col) {
           auto& cell = tetris.board[row][col];
           if (cell.type != PieceType::EMPTY && cell.type != PieceType::GAMEOVER) {
             cell.type = PieceType::GAMEOVER;
