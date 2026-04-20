@@ -7,14 +7,15 @@
 
 #include "Types.h"
 #include "Func.h"
+#include "Sensor.h"
 #include "GamePadButton.h"
 #include "MyAdafruitSeesaw.h"
 
-class AdafruitI2CGamepad {
+class AdafruitI2CGamepad : public rgb::Sensor {
   constexpr static auto doNothing() -> void {}
 public:
-  auto start() -> void;
-  auto update() -> void;
+  auto doStart() -> bool override;
+  auto doRead() -> void override;
 
   Adafruit_seesaw seesaw;
   GamePadButton buttonX{};

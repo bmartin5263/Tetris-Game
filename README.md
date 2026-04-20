@@ -1,6 +1,7 @@
 # Tetris (Game)
 The game-portion of my 2-part AI Tetris project
 
-## Bugs
-- Ghost piece for I does not go all way to bottom
-  - To Reproduce: Start a game with I piece
+## Development
+
+- Run `pio system prune` if unable to pull latest `rgblib` dependency
+  - Is slow though, however, better to figure out why the pulling sporadically fails

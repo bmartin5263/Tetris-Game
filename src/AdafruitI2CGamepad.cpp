@@ -17,24 +17,26 @@ constexpr auto BUTTOM_MASK = (1UL << BUTTON_X) | (1UL << BUTTON_Y) | (1UL << BUT
                        (1UL << BUTTON_A) | (1UL << BUTTON_B) | (1UL << BUTTON_SELECT);
 constexpr auto MAX_ANALOG_VALUE = 1023;
 
-auto AdafruitI2CGamepad::start() -> void {
+auto AdafruitI2CGamepad::doStart() -> bool {
   TRACE("Starting AdafruitI2CGamepad");
   if (!seesaw.begin(0x50)) {
     ERROR("Failed to begin() seesaw");
-    return;
+    return false;
   }
 
   auto version = ((seesaw.getVersion() >> 16) & 0xFFFF);
   if (version != 5743) {
     ERROR("Invalid seesaw version");
-    return;
+    return false;
   }
 
   seesaw.pinModeBulk(BUTTOM_MASK, INPUT_PULLUP);
   seesaw.setGPIOInterrupts(BUTTOM_MASK, 1);
+
+  return true;
 }
 
-auto AdafruitI2CGamepad::update() -> void {
+auto AdafruitI2CGamepad::doRead() -> void {
   // Reverse x/y values to match joystick orientation
   auto x = MAX_ANALOG_VALUE - seesaw.analogRead(14);
   auto y = MAX_ANALOG_VALUE - seesaw.analogRead(15);
