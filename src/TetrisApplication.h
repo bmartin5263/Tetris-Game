@@ -16,11 +16,13 @@
 #include "Piece.h"
 #include "Tetris.h"
 #include "AdafruitI2CGamepad.h"
+#include "BotController.h"
 
 using namespace rgb;
 
 auto sevenSegDisplay = MAX7219EightDigitSevenSegmentDisplay{D5};
 auto gamepad = AdafruitI2CGamepad{};
+auto botController = BotController{};
 auto grid = FastLEDMatrix<8, 8, D2_RGB, RgbwSupport::ENABLE, 3, 2>();
 
 class TetrisApplication : public UserApplication<> {
@@ -29,44 +31,49 @@ class TetrisApplication : public UserApplication<> {
   constexpr static auto GHOST_COLOR = Color::WHITE() * .01f;
   constexpr static auto GAME_OVER_LOW_COLOR = Color::RED() * .005f;
   constexpr static auto GAME_OVER_HIGH_COLOR = Color::RED() * .04f;
+  constexpr static auto LEFT = Point{-1, 0};
+  constexpr static auto RIGHT = Point{1, 0};
+  constexpr static auto DOWN = Point{0, 1};
 
 protected:
   auto configure(Configurer& app) -> void override {
     grid.setBrightness(1.0f);
     app.addLEDs(grid);
     app.addSensor(gamepad);
-    app.useHeartbeatLED();
+    app.addSensor(botController);
 
     SPI.begin();
     sevenSegDisplay.start();
-    gamepad.start();
 
     setupGamepad();
-    INFO("NEW GAME");
     newGame();
   }
 
   auto update() -> void override {
+    if (inAnimation) {
+      return;
+    }
+    if (botController.hasChar()) {
+      processBotCommand(botController.takeChar());
+    }
+
     if (leftTrigger.test()) {
-      if (!inAnimation) {
-        tetris.movePiece(Point {-1, 0});
-      }
+      INFO("Gamepad Left");
+      tetris.movePiece(LEFT);
     }
     if (rightTrigger.test()) {
-      if (!inAnimation) {
-        tetris.movePiece(Point{1, 0});
-      }
+      INFO("Gamepad Right");
+      tetris.movePiece(RIGHT);
     }
     if (downTrigger.test()) {
-      if (!inAnimation && !dropping) {
-        auto result = tetris.movePiece(Point {0, 1});
+      INFO("Gamepad Down");
+      if (!dropping) {
+        auto result = tetris.movePiece(DOWN);
         processMoveResult(result);
       }
     }
 
-    if (!inAnimation) {
-      autoDropTimer.update();
-    }
+    autoDropTimer.update();
   }
 
   auto draw() -> void override {
@@ -79,7 +86,11 @@ protected:
     }
 
     // Fill in borders
-    auto color = mapToColor(tetris.nextPiece->type);
+    constexpr auto FADE_DURATION = Duration::Milliseconds(150);
+    auto elapsed = Clock::Now().timeSince(nextTetrominoAt);
+    auto t = static_cast<float>(elapsed.value) / static_cast<float>(FADE_DURATION.value);
+    auto color =  mapToColor(tetris.currentPiece->type).lerpClamp(mapToColor(tetris.nextPiece->type), t);
+
     for (int row = 0; row < ROW_COUNT; ++row) {
       for (int col = 0; col < 3; ++col) {
         grid.set(col, row, color);
@@ -90,7 +101,7 @@ protected:
     }
 
     sevenSegDisplay.clear();
-    sevenSegDisplay.writeNumber(tetris.getScore().points, 0, SevenSegmentDigit::_0);
+    sevenSegDisplay.writeNumber(static_cast<int>(tetris.getScore().points), 0, SevenSegmentDigit::_0);
   }
 
   auto postDraw() -> void override {
@@ -100,12 +111,51 @@ protected:
 private:
 
   auto newGame() -> void {
-    gameStartAt = Clock::Now();
-    gameEndAt = Timestamp{};
     tetris.newGame();
     autoDropTimer.reset();
     dropTimerHandle.cancel();
     rainbowing = false;
+  }
+
+  auto processBotCommand(char c) -> void {
+    INFO("Processing Bot Command %c", c);
+    switch (c) {
+      case 'I':
+      case 'i':
+        INFO("Bot Rotate Right");
+        tetris.rotatePieceRight();
+        break;
+      case 'E':
+      case 'e':
+        INFO("Bot Rotate Left");
+        tetris.rotatePieceLeft();
+        break;
+      case 'D':
+      case 'd':
+        INFO("Bot Down");
+        if (!dropping) {
+          auto result = tetris.movePiece(DOWN);
+          processMoveResult(result);
+        }
+        break;
+      case 'R':
+      case 'r':
+        INFO("Bot Right");
+        tetris.movePiece(RIGHT);
+        break;
+      case 'L':
+      case 'l':
+        INFO("Bot Left");
+        tetris.movePiece(LEFT);
+        break;
+      case 'N':
+      case 'n':
+        INFO("Bot New Game");
+        tetris.newGame();
+        break;
+      default:
+        break;
+    }
   }
 
   auto processMoveResult(MoveResult& result) -> void {
@@ -115,9 +165,10 @@ private:
         runRowClearAnimation(result);
       }
       else {
+        INFO("Advancing to Next Piece");
         tetris.advanceNextPiece();
+        nextTetrominoAt = Clock::Now();
         if (tetris.isGameOver()) {
-          gameEndAt = Clock::Now();
           runGameOverAnimation();
         }
       }
@@ -125,16 +176,17 @@ private:
   }
 
   auto runRowClearAnimation(MoveResult& result) -> void {
-    INFO("Run Row Clear Animation");
+    INFO("Started Row Clear Animation");
     inAnimation = true;
     Timer::SetImmediateTimeout(
       [&, result, frame = 0](TimerContext& context) mutable {
-        if (frame == tetris.columnCount()) {
+        if (frame == Tetris::COLUMNS) {
           tetris.clearRows(result.rowNumbers, result.rowsCleared);
           tetris.advanceNextPiece();
+          nextTetrominoAt = Clock::Now();
           autoDropTimer.reset();
           inAnimation = false;
-          INFO("Row Clear Animation Done");
+          INFO("Finished Row Clear Animation, Advancing to Next Piece");
           if (result.rowsCleared == 4) {
             rainbowing = true;
             rainbowTimerHandle = Timer::SetTimeout(Duration::Seconds(3), [&](){ rainbowing = false; });
@@ -155,7 +207,7 @@ private:
   }
 
   auto runGameOverAnimation() -> void {
-    TRACE("Run GameOver Animation");
+    INFO("Started Game Over Animation");
     inAnimation = true;
     Timer::SetImmediateTimeout(
       [&](TimerContext& context) mutable {
@@ -177,6 +229,7 @@ private:
           context.repeatIn = Duration::Milliseconds(10);
         }
         else {
+          INFO("Game Over");
           inAnimation = false;
         }
       }).detach();
@@ -184,6 +237,7 @@ private:
 
   auto setupGamepad() -> void {
     gamepad.buttonB.onPress([this](){
+      INFO("Gamepad Drop");
       if (dropping) {
         dropTimerHandle.cancel();
         dropping = false;
@@ -191,7 +245,7 @@ private:
       else if (!tetris.isGameOver()) {
         dropping = true;
         dropTimerHandle = Timer::SetImmediateTimeout([&](TimerContext& context){
-          auto result = tetris.movePiece(Point {0, 1});
+          auto result = tetris.movePiece(DOWN);
           if (result.nextPiece) {
             dropping = false;
             processMoveResult(result);
@@ -203,26 +257,30 @@ private:
       }
     });
     gamepad.buttonA.onPress([this](){
+      INFO("Gamepad Rotate Right");
       if (!inAnimation) {
         tetris.rotatePieceRight();
       }
     });
     gamepad.buttonY.onPress([this](){
+      INFO("Gamepad Rotate Left");
       if (!inAnimation) {
         tetris.rotatePieceLeft();
       }
     });
     gamepad.buttonSelect.onPress([this](){
+      INFO("Gamepad New Game");
       if (!inAnimation) {
         newGame();
       }
     });
     gamepad.buttonStart.onPress([this](){
+      INFO("Gamepad Toggle Ghost");
       tetris.toggleGhost();
     });
   }
 
-  auto mapToColor(Cell cell) -> Color {
+  auto mapToColor(Cell cell) const -> Color {
     Color color = Color::OFF();
 
     if (cell.destroying) {
@@ -233,7 +291,7 @@ private:
     auto time = Clock::Now().mod(speed).as<float>() / speed.as<float>();
 
     if (rainbowing && cell.type != PieceType::EMPTY) {
-      color = Color::HslToRgb(time);
+      color = Color::HslToRgb(time) * .02f;
       return color;
     }
 
@@ -282,9 +340,8 @@ private:
     return color;
   }
 
-  Timestamp gameStartAt{};
-  Timestamp gameEndAt{};
   Tetris tetris{};
+  Timestamp nextTetrominoAt{};
   TimerHandle rowClearAnimationHandle{};
   TimerHandle dropTimerHandle{};
   TimerHandle rainbowTimerHandle{};
@@ -298,7 +355,8 @@ private:
     return gamepad.analogY <= .03f;
   }};
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
-    auto result = tetris.movePiece({0, 1});
+    INFO("Auto Drop");
+    auto result = tetris.movePiece(DOWN);
     processMoveResult(result);
   }};
   bool inAnimation{false};

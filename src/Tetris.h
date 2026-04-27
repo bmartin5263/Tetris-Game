@@ -33,13 +33,13 @@ struct Row {
 };
 
 class Tetris {
+public:
   constexpr static auto COLUMNS = static_cast<size_t>(GAME_COLUMN_COUNT);
   constexpr static auto ROWS = static_cast<size_t>(ROW_COUNT);
 
   using Point = rgb::Point;
   using Board = std::array<Row, ROWS>;
 
-public:
   constexpr static auto START_POSITION = rgb::Point { static_cast<int>(COLUMNS / 2) - 1, 1 };
   constexpr static auto POINT_VALUES = std::array { 100, 300, 1200, 3600 };
 
@@ -48,14 +48,11 @@ public:
   auto clearRows(const std::array<size_t, 4>& rows, size_t count) -> void;
 
   auto movePiece(Point movement) -> MoveResult;
-  auto dropPiece() -> MoveResult;
   auto rotatePieceLeft() -> void;
   auto rotatePieceRight() -> void;
   auto getScore() -> const Score&;
   auto toggleGhost() -> void;
   constexpr auto isGameOver() const -> bool { return gameOver; }
-
-  static auto columnCount() -> size_t { return COLUMNS; }
 
   Board board{PieceType::EMPTY};
   const Piece* currentPiece{&Piece::O};

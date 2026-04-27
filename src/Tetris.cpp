@@ -5,7 +5,6 @@
 #include "Tetris.h"
 
 auto Tetris::placeCurrentPiece() -> void {
-  TRACE("PLACE CURRENT TETROMINO");
   if (ghostEnabled) {
     placePiece(currentPiece, ghostPosition, PieceType::GHOST);
   }
@@ -13,7 +12,6 @@ auto Tetris::placeCurrentPiece() -> void {
 }
 
 auto Tetris::removeCurrentPiece() -> void {
-  TRACE("REMOVE CURRENT TETROMINO");
   if (ghostEnabled) {
     removePiece(currentPiece, ghostPosition);
   }
@@ -46,23 +44,8 @@ auto Tetris::getScore() -> const Score& {
   return score;
 }
 
-auto Tetris::dropPiece() -> MoveResult {
-  if (gameOver) {
-    return {};
-  }
-  auto offset = Point {0, 1};
-  while (canPlaceCurrentPieceAtOffset(offset)) {
-    ++offset.y;
-  }
-  --offset.y;
-  auto result = movePiece(offset);
-  result.nextPiece = true;
-  calculateRowsToClear(result);
-  return result;
-}
-
 auto Tetris::newGame() -> void {
-  TRACE("NEW GAME");
+  INFO("New Game");
   std::for_each(board.begin(), board.end(), [](auto& row) {
     row.clear();
   });
@@ -130,7 +113,7 @@ auto Tetris::movePiece(Point movement) -> MoveResult {
     return {};
   }
 
-  TRACE("MOVE TETROMINO");
+  TRACE("Move Tetromino (%i, %i)", movement.x, movement.y);
   auto result = MoveResult{};
   auto isDrop = movement.y > 0;
   if (canPlaceCurrentPieceAtOffset(movement)) {
@@ -165,7 +148,6 @@ auto Tetris::advanceNextPiece() -> void {
 }
 
 auto Tetris::canPlaceCurrentPieceAtOffset(Point offset) -> bool {
-  TRACE("CAN PLACE CURRENT AT OFFSET");
   auto pickUpCurrentPiece = PickUpCurrentPiece(*this);
   auto pos = currentPosition + offset;
   return canPlacePiece(currentPiece, pos);
@@ -180,7 +162,6 @@ auto Tetris::placePiece(const Piece* piece, Point position, PieceType pieceType)
     auto pos = position + offset;
     ASSERT(pos.x >= 0 && pos.x < COLUMNS, "Position x out of range");
     ASSERT(pos.y >= 0 && pos.y < ROWS, "Position y out of range");
-    TRACE("Placing at %i, %i", pos.x, pos.y);
     board[pos.y][pos.x].type = pieceType;
   }
 }

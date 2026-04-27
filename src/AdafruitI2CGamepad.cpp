@@ -44,6 +44,11 @@ auto AdafruitI2CGamepad::doRead() -> void {
   analogY = static_cast<normal>(y) / static_cast<normal>(MAX_ANALOG_VALUE);
 
   auto buttons = seesaw.digitalReadBulk(BUTTOM_MASK);
+  TRACE("Game Pad Buttons: %i : %x", buttons, buttons);
+  if (buttons == 0) {
+    doStart();
+    return;
+  }
 
   buttonA.update(!(buttons & (1UL << BUTTON_A)));
   buttonB.update(!(buttons & (1UL << BUTTON_B)));
