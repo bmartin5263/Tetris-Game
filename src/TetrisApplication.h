@@ -101,7 +101,7 @@ protected:
     }
 
     sevenSegDisplay.clear();
-    sevenSegDisplay.writeNumber(static_cast<int>(tetris.getScore().points), 0, SevenSegmentDigit::_0);
+    sevenSegDisplay.writeNumber(static_cast<int>(tetris.getScore().points), SevenSegmentDigit::_0);
   }
 
   auto postDraw() -> void override {
@@ -161,6 +161,7 @@ private:
   auto processMoveResult(MoveResult& result) -> void {
     autoDropTimer.reset();
     if (result.nextPiece) {
+      dropTimerHandle.cancel();
       if (result.rowsCleared > 0) {
         runRowClearAnimation(result);
       }
@@ -179,8 +180,8 @@ private:
     INFO("Started Row Clear Animation");
     inAnimation = true;
     Timer::SetImmediateTimeout(
-      [&, result, frame = 0](TimerContext& context) mutable {
-        if (frame == Tetris::COLUMNS) {
+      [&, result, column = 0](TimerContext& context) mutable {
+        if (column == Tetris::COLUMNS) {
           tetris.clearRows(result.rowNumbers, result.rowsCleared);
           tetris.advanceNextPiece();
           nextTetrominoAt = Clock::Now();
@@ -195,12 +196,9 @@ private:
         else {
           for (int i = 0; i < result.rowsCleared; ++i) {
             int rowNum = static_cast<int>(result.rowNumbers[i]);
-            tetris.board[rowNum][frame].destroying = true;
-            if (frame > 0) {
-              tetris.board[rowNum][frame - 1].type = PieceType::EMPTY;
-            }
+            tetris.board[rowNum][column].destroying = true;
           }
-          ++frame;
+          ++column;
           context.repeatIn = Duration::Milliseconds(10);
         }
       }).detach();
@@ -248,6 +246,7 @@ private:
           auto result = tetris.movePiece(DOWN);
           if (result.nextPiece) {
             dropping = false;
+            INFO("Drop Finished");
             processMoveResult(result);
           }
           else {
@@ -276,7 +275,9 @@ private:
     });
     gamepad.buttonStart.onPress([this](){
       INFO("Gamepad Toggle Ghost");
-      tetris.toggleGhost();
+      if (!inAnimation) {
+        tetris.toggleGhost();
+      }
     });
   }
 
@@ -284,7 +285,7 @@ private:
     Color color = Color::OFF();
 
     if (cell.destroying) {
-      color += DESTROY_COLOR;
+      return DESTROY_COLOR;
     }
 
     auto speed = Duration::Milliseconds(600);
@@ -332,7 +333,7 @@ private:
         color += Color::MAGENTA() * .02f;
         break;
       case PieceType::I:
-        color += Color::RED() * .02f;
+        color += Color(1.0f, 0.0f, 0.18f) * .02f;
         break;
       default:
         ASSERT(false, "Unhandled PieceType");
@@ -357,6 +358,9 @@ private:
   Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
     INFO("Auto Drop");
     auto result = tetris.movePiece(DOWN);
+    if (result.nextPiece) {
+      INFO("Auto Next Piece");
+    }
     processMoveResult(result);
   }};
   bool inAnimation{false};

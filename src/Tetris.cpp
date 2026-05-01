@@ -20,6 +20,11 @@ auto Tetris::removeCurrentPiece() -> void {
 
 auto Tetris::toggleGhost() -> void {
   ghostEnabled = !ghostEnabled;
+
+  if (gameOver) {
+    return;
+  }
+
   if (ghostEnabled) {
     // TODO buggy code
     removePiece(currentPiece, currentPosition);
@@ -45,7 +50,7 @@ auto Tetris::getScore() -> const Score& {
 }
 
 auto Tetris::newGame() -> void {
-  INFO("New Game");
+  INFO("---- New Game ----");
   std::for_each(board.begin(), board.end(), [](auto& row) {
     row.clear();
   });
@@ -123,6 +128,7 @@ auto Tetris::movePiece(Point movement) -> MoveResult {
     result.didMove = true;
   }
   if (!result.didMove && isDrop) {
+    INFO("Tetromino Planted At (%i, %i)", currentPosition.x, currentPosition.y);
     result.nextPiece = true;
     calculateRowsToClear(result);
   }

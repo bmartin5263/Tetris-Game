@@ -96,7 +96,7 @@ public:
   }
 
   auto writeDigit(SevenSegmentDigit digit, unsigned int offset) -> void {
-    writeNumber(static_cast<int>(digit), offset);
+    writeNumber(static_cast<int>(digit), SevenSegmentDigit::BLANK, offset);
   }
 
   auto writeDigitOrBlank(SevenSegmentDigit digit, unsigned int offset) -> void {
@@ -104,7 +104,7 @@ public:
       writePattern(EMPTY, offset);
     }
     else {
-      writeNumber(static_cast<int>(digit), offset);
+      writeNumber(static_cast<int>(digit), SevenSegmentDigit::BLANK, offset);
     }
   }
 
@@ -127,7 +127,7 @@ public:
     }
   }
 
-  auto writeNumber(int number, unsigned int offset = 0, SevenSegmentDigit padding = SevenSegmentDigit::BLANK) -> void {
+  auto writeNumber(int number, SevenSegmentDigit padding = SevenSegmentDigit::BLANK, unsigned int offset = 0) -> void {
     // Handle negative numbers
     bool isNegative = false;
     if (number < 0) {
@@ -137,7 +137,7 @@ public:
 
     // Handle zero case
     if (number == 0) {
-      writePattern(DIGIT_PATTERNS[0], offset);
+      writePattern(DIGIT_PATTERNS[0], offset, DIGITS);
       return;
     }
 
