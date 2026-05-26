@@ -17,6 +17,10 @@
 #include "Tetris.h"
 #include "AdafruitI2CGamepad.h"
 #include "BotController.h"
+#include "ColorfulPalette.h"
+#include "RainbowPalette.h"
+#include "CalibrationPalette.h"
+#include "Carousel.h"
 
 using namespace rgb;
 
@@ -24,16 +28,16 @@ auto sevenSegDisplay = MAX7219EightDigitSevenSegmentDisplay{D5};
 auto gamepad = AdafruitI2CGamepad{};
 auto botController = BotController{};
 auto grid = FastLEDMatrix<8, 8, D2_RGB, RgbwSupport::ENABLE, 3, 2>();
+auto colorfulPalette = ColorfulPalette{};
+auto rainbowPalette = RainbowPalette{};
+auto calibrationPalette = CalibrationPalette{};
 
 class TetrisApplication : public UserApplication<> {
-  static constexpr auto DESTROY_COLOR = Color::WHITE() * .05f;
-  static constexpr auto GAME_OVER_COLOR = Color::WHITE() * .01f;
-  constexpr static auto GHOST_COLOR = Color::WHITE() * .01f;
-  constexpr static auto GAME_OVER_LOW_COLOR = Color::RED() * .005f;
-  constexpr static auto GAME_OVER_HIGH_COLOR = Color::RED() * .04f;
   constexpr static auto LEFT = Point{-1, 0};
   constexpr static auto RIGHT = Point{1, 0};
   constexpr static auto DOWN = Point{0, 1};
+  constexpr static size_t NORMAL_PALETTE = 0;
+  constexpr static size_t CALIBRATION_PALETTE = 2;
 
 protected:
   auto configure(Configurer& app) -> void override {
@@ -77,10 +81,12 @@ protected:
   }
 
   auto draw() -> void override {
+    auto* palette = palettes.get();
+
     // Fill in the game
     for (int row = 0; row < ROW_COUNT; ++row) {
       for (int col = 0; col < GAME_COLUMN_COUNT; ++col) {
-        auto color = mapToColor(tetris.board[row][col]);
+        auto color = palette->mapToColor(tetris.board[row][col]);
         grid.set(col + 3, row, color);
       }
     }
@@ -89,7 +95,7 @@ protected:
     constexpr auto FADE_DURATION = Duration::Milliseconds(150);
     auto elapsed = Clock::Now().timeSince(nextTetrominoAt);
     auto t = static_cast<float>(elapsed.value) / static_cast<float>(FADE_DURATION.value);
-    auto color =  mapToColor(tetris.currentPiece->type).lerpClamp(mapToColor(tetris.nextPiece->type), t);
+    auto color = palette->mapToColor(tetris.currentPiece->type).lerpClamp(palette->mapToColor(tetris.nextPiece->type), t);
 
     for (int row = 0; row < ROW_COUNT; ++row) {
       for (int col = 0; col < 3; ++col) {
@@ -114,7 +120,6 @@ private:
     tetris.newGame();
     autoDropTimer.reset();
     dropTimerHandle.cancel();
-    rainbowing = false;
   }
 
   auto processBotCommand(char c) -> void {
@@ -153,6 +158,16 @@ private:
         INFO("Bot New Game");
         tetris.newGame();
         break;
+      case 'C':
+      case 'c':
+        INFO("Bot Calibration Palette");
+        palettes.set(CALIBRATION_PALETTE);
+        break;
+      case 'K':
+      case 'k':
+        INFO("Bot Normal Palette");
+        palettes.set(NORMAL_PALETTE);
+        break;
       default:
         break;
     }
@@ -188,10 +203,6 @@ private:
           autoDropTimer.reset();
           inAnimation = false;
           INFO("Finished Row Clear Animation, Advancing to Next Piece");
-          if (result.rowsCleared == 4) {
-            rainbowing = true;
-            rainbowTimerHandle = Timer::SetTimeout(Duration::Seconds(3), [&](){ rainbowing = false; });
-          }
         }
         else {
           for (int i = 0; i < result.rowsCleared; ++i) {
@@ -267,6 +278,10 @@ private:
         tetris.rotatePieceLeft();
       }
     });
+    gamepad.buttonX.onPress([this](){
+      INFO("Gamepad Cycle Palette");
+      palettes.next();
+    });
     gamepad.buttonSelect.onPress([this](){
       INFO("Gamepad New Game");
       if (!inAnimation) {
@@ -281,71 +296,15 @@ private:
     });
   }
 
-  auto mapToColor(Cell cell) const -> Color {
-    Color color = Color::OFF();
-
-    if (cell.destroying) {
-      return DESTROY_COLOR;
-    }
-
-    auto speed = Duration::Milliseconds(600);
-    auto time = Clock::Now().mod(speed).as<float>() / speed.as<float>();
-
-    if (rainbowing && cell.type != PieceType::EMPTY) {
-      color = Color::HslToRgb(time) * .02f;
-      return color;
-    }
-
-    switch (cell.type) {
-      case PieceType::EMPTY:
-        break;
-      case PieceType::GHOST:
-        color = GHOST_COLOR;
-        break;
-      case PieceType::GAMEOVER:
-        color = GAME_OVER_HIGH_COLOR.lerpWrap(GAME_OVER_LOW_COLOR, time);
-        break;
-      default:
-        color = mapToColor(cell.type);
-    }
-    return color;
-  }
-
-  static auto mapToColor(PieceType type) -> Color {
-    Color color = Color::OFF();
-    switch (type) {
-      case PieceType::O:
-        color += Color::YELLOW() * .02f;
-        break;
-      case PieceType::J:
-        color += Color::BLUE() * .02f;
-        break;
-      case PieceType::L:
-        color += Color::ORANGE() * .02f;
-        break;
-      case PieceType::T:
-        color += Color::CYAN() * .02f;
-        break;
-      case PieceType::Z:
-        color += Color::GREEN() * .02f;
-        break;
-      case PieceType::S:
-        color += Color::MAGENTA() * .02f;
-        break;
-      case PieceType::I:
-        color += Color(1.0f, 0.0f, 0.18f) * .02f;
-        break;
-      default:
-        ASSERT(false, "Unhandled PieceType");
-    }
-    return color;
-  }
-
   Tetris tetris{};
   Timestamp nextTetrominoAt{};
   TimerHandle rowClearAnimationHandle{};
   TimerHandle dropTimerHandle{};
-  TimerHandle rainbowTimerHandle{};
+  Carousel<const ColorPalette*, 3> palettes{std::array<const ColorPalette*, 3>{
+    &colorfulPalette,
+    &rainbowPalette,
+    &calibrationPalette,
+  }};
   Trigger leftTrigger{[](){
     return gamepad.analogX <= .03f;
   }};
@@ -365,7 +324,6 @@ private:
   }};
   bool inAnimation{false};
   bool dropping{false};
-  bool rainbowing{false};
 };
 
 
