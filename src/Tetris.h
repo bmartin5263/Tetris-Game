@@ -52,7 +52,8 @@ public:
   auto rotatePieceRight() -> void;
   auto getScore() -> const Score&;
   auto toggleGhost() -> void;
-  constexpr auto isGameOver() const -> bool { return gameOver; }
+  auto isGhostEnabled() const -> bool { return ghostEnabled; }
+  auto isGameOver() const -> bool { return gameOver; }
 
   Board board{PieceType::EMPTY};
   const Piece* currentPiece{&Piece::O};

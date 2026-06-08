@@ -19,25 +19,30 @@
 #include "BotController.h"
 #include "ColorfulPalette.h"
 #include "RainbowPalette.h"
-#include "CalibrationPalette.h"
+#include "SolidPalette.h"
 #include "Carousel.h"
 
 using namespace rgb;
 
-auto sevenSegDisplay = MAX7219EightDigitSevenSegmentDisplay{D5};
-auto gamepad = AdafruitI2CGamepad{};
-auto botController = BotController{};
-auto grid = FastLEDMatrix<8, 8, D2_RGB, RgbwSupport::ENABLE, 3, 2>();
-auto colorfulPalette = ColorfulPalette{};
-auto rainbowPalette = RainbowPalette{};
-auto calibrationPalette = CalibrationPalette{};
+inline auto sevenSegDisplay = MAX7219EightDigitSevenSegmentDisplay{D5};
+inline auto gamepad = AdafruitI2CGamepad{};
+inline auto botController = BotController{};
+inline auto grid = FastLEDMatrix<8, 8, D2_RGB, RgbwSupport::ENABLE, 3, 2>();
+inline auto colorfulPalette = ColorfulPalette{};
+inline auto rainbowPalette = RainbowPalette{};
+inline auto whitePalette = SolidPalette{Color::WHITE() * .02f};
+inline auto redPalette = SolidPalette{Color::RED() * .02f};
+inline auto orangePalette = SolidPalette{Color::ORANGE() * .02f};
+inline auto yellowPalette = SolidPalette{Color::YELLOW() * .02f};
+inline auto greenPalette = SolidPalette{Color::GREEN() * .02f};
+inline auto cyanPalette = SolidPalette{Color::CYAN() * .02f};
+inline auto bluePalette = SolidPalette{Color::BLUE() * .02f};
+inline auto purplePalette = SolidPalette{Color::MAGENTA() * .02f};
 
 class TetrisApplication : public UserApplication<> {
   constexpr static auto LEFT = Point{-1, 0};
   constexpr static auto RIGHT = Point{1, 0};
   constexpr static auto DOWN = Point{0, 1};
-  constexpr static size_t NORMAL_PALETTE = 0;
-  constexpr static size_t CALIBRATION_PALETTE = 2;
 
 protected:
   auto configure(Configurer& app) -> void override {
@@ -77,7 +82,14 @@ protected:
       }
     }
 
-    autoDropTimer.update();
+    if (every(Duration::Seconds(1), autoDropTimer)) {
+      INFO("Auto Drop");
+      auto result = tetris.movePiece(DOWN);
+      if (result.nextPiece) {
+        INFO("Auto Next Piece");
+      }
+      processMoveResult(result);
+    }
   }
 
   auto draw() -> void override {
@@ -118,7 +130,7 @@ private:
 
   auto newGame() -> void {
     tetris.newGame();
-    autoDropTimer.reset();
+    autoDropTimer = Clock::Now();
     dropTimerHandle.cancel();
   }
 
@@ -158,23 +170,36 @@ private:
         INFO("Bot New Game");
         tetris.newGame();
         break;
-      case 'C':
-      case 'c':
-        INFO("Bot Calibration Palette");
-        palettes.set(CALIBRATION_PALETTE);
+      case 'G':
+      case 'g':
+        INFO("Bot New Game (full reset)");
+        newGame();
+        if (tetris.isGhostEnabled()) {
+          tetris.toggleGhost();
+        }
         break;
-      case 'K':
-      case 'k':
-        INFO("Bot Normal Palette");
-        palettes.set(NORMAL_PALETTE);
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9': {
+        auto index = static_cast<size_t>(c - '0');
+        INFO("Bot Select Palette %zu", index);
+        palettes.set(index);
         break;
+      }
       default:
         break;
     }
   }
 
   auto processMoveResult(MoveResult& result) -> void {
-    autoDropTimer.reset();
+    autoDropTimer = Clock::Now();
     if (result.nextPiece) {
       dropTimerHandle.cancel();
       if (result.rowsCleared > 0) {
@@ -200,7 +225,7 @@ private:
           tetris.clearRows(result.rowNumbers, result.rowsCleared);
           tetris.advanceNextPiece();
           nextTetrominoAt = Clock::Now();
-          autoDropTimer.reset();
+          autoDropTimer = Clock::Now();
           inAnimation = false;
           INFO("Finished Row Clear Animation, Advancing to Next Piece");
         }
@@ -300,10 +325,17 @@ private:
   Timestamp nextTetrominoAt{};
   TimerHandle rowClearAnimationHandle{};
   TimerHandle dropTimerHandle{};
-  Carousel<const ColorPalette*, 3> palettes{std::array<const ColorPalette*, 3>{
+  Carousel<const ColorPalette*, 10> palettes{std::array<const ColorPalette*, 10>{
     &colorfulPalette,
     &rainbowPalette,
-    &calibrationPalette,
+    &whitePalette,
+    &redPalette,
+    &orangePalette,
+    &yellowPalette,
+    &greenPalette,
+    &cyanPalette,
+    &bluePalette,
+    &purplePalette,
   }};
   Trigger leftTrigger{[](){
     return gamepad.analogX <= .03f;
@@ -314,14 +346,7 @@ private:
   Trigger downTrigger{[](){
     return gamepad.analogY <= .03f;
   }};
-  Every autoDropTimer = Every{Duration::Seconds(1), [this]() {
-    INFO("Auto Drop");
-    auto result = tetris.movePiece(DOWN);
-    if (result.nextPiece) {
-      INFO("Auto Next Piece");
-    }
-    processMoveResult(result);
-  }};
+  Timestamp autoDropTimer{};
   bool inAnimation{false};
   bool dropping{false};
 };
