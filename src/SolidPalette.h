@@ -9,7 +9,7 @@
 
 class SolidPalette : public ColorPalette {
 public:
-  explicit SolidPalette(rgb::Color color);
+  SolidPalette(rgb::Color color, const float& brightness);
   ~SolidPalette() override = default;
   SolidPalette(const SolidPalette&) = default;
   SolidPalette(SolidPalette&&) = default;
@@ -21,6 +21,7 @@ public:
 
 private:
   rgb::Color color;
+  const float* brightness;
 };
 
 #endif //TETRISGAME_SOLIDPALETTE_H

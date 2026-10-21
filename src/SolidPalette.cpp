@@ -6,12 +6,12 @@
 
 using namespace rgb;
 
-SolidPalette::SolidPalette(Color color) : color{color} {}
+SolidPalette::SolidPalette(Color color, const float& brightness) : color{color}, brightness{&brightness} {}
 
 auto SolidPalette::mapToColor(Cell cell) const -> Color {
-  return color;
+  return color * *brightness;
 }
 
 auto SolidPalette::mapToColor(PieceType type) const -> Color {
-  return color;
+  return color * *brightness;
 }

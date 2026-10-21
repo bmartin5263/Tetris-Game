@@ -10,10 +10,11 @@ using namespace rgb;
 
 namespace {
 constexpr auto DESTROY_COLOR = Color::WHITE() * .05f;
-constexpr auto GHOST_COLOR = Color::WHITE() * .01f;
 constexpr auto GAME_OVER_LOW_COLOR = Color::RED() * .005f;
 constexpr auto GAME_OVER_HIGH_COLOR = Color::RED() * .04f;
 }
+
+ColorfulPalette::ColorfulPalette(const float& brightness) : brightness{&brightness} {}
 
 auto ColorfulPalette::mapToColor(Cell cell) const -> Color {
   Color color = Color::OFF();
@@ -29,7 +30,7 @@ auto ColorfulPalette::mapToColor(Cell cell) const -> Color {
     case PieceType::EMPTY:
       break;
     case PieceType::GHOST:
-      color = GHOST_COLOR;
+      color = Color::WHITE() * *brightness;
       break;
     case PieceType::GAMEOVER:
       color = GAME_OVER_HIGH_COLOR.lerpWrap(GAME_OVER_LOW_COLOR, time);
@@ -44,25 +45,25 @@ auto ColorfulPalette::mapToColor(PieceType type) const -> Color {
   Color color = Color::OFF();
   switch (type) {
     case PieceType::O:
-      color += Color::YELLOW() * .02f;
+      color += Color::YELLOW() * *brightness;
       break;
     case PieceType::J:
-      color += Color::BLUE() * .02f;
+      color += Color::BLUE() * *brightness;
       break;
     case PieceType::L:
-      color += Color::ORANGE() * .02f;
+      color += Color::ORANGE() * *brightness;
       break;
     case PieceType::T:
-      color += Color::CYAN() * .02f;
+      color += Color::CYAN() * *brightness;
       break;
     case PieceType::Z:
-      color += Color::GREEN() * .02f;
+      color += Color::GREEN() * *brightness;
       break;
     case PieceType::S:
-      color += Color::MAGENTA() * .02f;
+      color += Color::MAGENTA() * *brightness;
       break;
     case PieceType::I:
-      color += Color(1.0f, 0.0f, 0.18f) * .02f;
+      color += Color::RED() * *brightness;
       break;
     default:
       ASSERT(false, "Unhandled PieceType");

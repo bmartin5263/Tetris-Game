@@ -11,7 +11,9 @@ namespace {
 constexpr auto DURATION = Duration::Seconds(10);
 }
 
+RainbowPalette::RainbowPalette(const float& brightness) : ColorfulPalette{brightness} {}
+
 auto RainbowPalette::mapToColor(PieceType type) const -> Color {
   auto time = Clock::Now().percentOfWrapped(DURATION);
-  return Color::HslToRgb(time) * .02f;
+  return Color::HslToRgb(time) * *brightness;
 }

@@ -9,7 +9,7 @@
 
 class ColorfulPalette : public ColorPalette {
 public:
-  ColorfulPalette() = default;
+  explicit ColorfulPalette(const float& brightness);
   ~ColorfulPalette() override = default;
   ColorfulPalette(const ColorfulPalette&) = default;
   ColorfulPalette(ColorfulPalette&&) = default;
@@ -18,6 +18,9 @@ public:
 
   auto mapToColor(Cell cell) const -> rgb::Color override;
   auto mapToColor(PieceType type) const -> rgb::Color override;
+
+protected:
+  const float* brightness;
 };
 
 #endif //TETRISGAME_COLORFULPALETTE_H

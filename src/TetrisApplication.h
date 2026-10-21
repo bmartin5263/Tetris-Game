@@ -28,16 +28,17 @@ inline auto sevenSegDisplay = MAX7219EightDigitSevenSegmentDisplay{D5};
 inline auto gamepad = AdafruitI2CGamepad{};
 inline auto botController = BotController{};
 inline auto grid = FastLEDMatrix<8, 8, D2_RGB, RgbwSupport::ENABLE, 3, 2>();
-inline auto colorfulPalette = ColorfulPalette{};
-inline auto rainbowPalette = RainbowPalette{};
-inline auto whitePalette = SolidPalette{Color::WHITE() * .02f};
-inline auto redPalette = SolidPalette{Color::RED() * .02f};
-inline auto orangePalette = SolidPalette{Color::ORANGE() * .02f};
-inline auto yellowPalette = SolidPalette{Color::YELLOW() * .02f};
-inline auto greenPalette = SolidPalette{Color::GREEN() * .02f};
-inline auto cyanPalette = SolidPalette{Color::CYAN() * .02f};
-inline auto bluePalette = SolidPalette{Color::BLUE() * .02f};
-inline auto purplePalette = SolidPalette{Color::MAGENTA() * .02f};
+inline auto mainBrightness = .02f;
+inline auto colorfulPalette = ColorfulPalette{mainBrightness};
+inline auto rainbowPalette = RainbowPalette{mainBrightness};
+inline auto whitePalette = SolidPalette{Color::WHITE(), mainBrightness};
+inline auto redPalette = SolidPalette{Color::RED(), mainBrightness};
+inline auto orangePalette = SolidPalette{Color::ORANGE(), mainBrightness};
+inline auto yellowPalette = SolidPalette{Color::YELLOW(), mainBrightness};
+inline auto greenPalette = SolidPalette{Color::GREEN(), mainBrightness};
+inline auto cyanPalette = SolidPalette{Color::CYAN(), mainBrightness};
+inline auto bluePalette = SolidPalette{Color::BLUE(), mainBrightness};
+inline auto purplePalette = SolidPalette{Color::MAGENTA(), mainBrightness};
 
 class TetrisApplication : public UserApplication<> {
   constexpr static auto LEFT = Point{-1, 0};
@@ -135,7 +136,7 @@ private:
   }
 
   auto processBotCommand(char c) -> void {
-    INFO("Processing Bot Command %c", c);
+    INFO("Processing Bot Command: %c", c);
     switch (c) {
       case 'I':
       case 'i':
@@ -154,6 +155,11 @@ private:
           auto result = tetris.movePiece(DOWN);
           processMoveResult(result);
         }
+        break;
+      case 'F':
+      case 'f':
+        INFO("Bot Drop");
+        dropPiece();
         break;
       case 'R':
       case 'r':
@@ -193,6 +199,21 @@ private:
         palettes.set(index);
         break;
       }
+      case '+':
+        mainBrightness += .01f;
+        INFO("Bot Brightness Up %f", mainBrightness);
+        break;
+      case '-':
+        mainBrightness -= .01f;
+        if (mainBrightness < 0.0f) {
+          mainBrightness = 0.0f;
+        }
+        INFO("Bot Brightness Down %f", mainBrightness);
+        break;
+      case '^':
+        mainBrightness = .15f;
+        INFO("Bot Top Brightness %f", mainBrightness);
+        break;
       default:
         break;
     }
@@ -269,27 +290,31 @@ private:
       }).detach();
   }
 
+  auto dropPiece() -> void {
+    if (dropping) {
+      dropTimerHandle.cancel();
+      dropping = false;
+    }
+    else if (!tetris.isGameOver()) {
+      dropping = true;
+      dropTimerHandle = Timer::SetImmediateTimeout([&](TimerContext& context){
+        auto result = tetris.movePiece(DOWN);
+        if (result.nextPiece) {
+          dropping = false;
+          INFO("Drop Finished");
+          processMoveResult(result);
+        }
+        else {
+          context.repeatIn = Duration::Milliseconds(5);
+        }
+      });
+    }
+  }
+
   auto setupGamepad() -> void {
     gamepad.buttonB.onPress([this](){
       INFO("Gamepad Drop");
-      if (dropping) {
-        dropTimerHandle.cancel();
-        dropping = false;
-      }
-      else if (!tetris.isGameOver()) {
-        dropping = true;
-        dropTimerHandle = Timer::SetImmediateTimeout([&](TimerContext& context){
-          auto result = tetris.movePiece(DOWN);
-          if (result.nextPiece) {
-            dropping = false;
-            INFO("Drop Finished");
-            processMoveResult(result);
-          }
-          else {
-            context.repeatIn = Duration::Milliseconds(5);
-          }
-        });
-      }
+      dropPiece();
     });
     gamepad.buttonA.onPress([this](){
       INFO("Gamepad Rotate Right");

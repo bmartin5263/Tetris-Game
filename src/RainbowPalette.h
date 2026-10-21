@@ -9,7 +9,7 @@
 
 class RainbowPalette : public ColorfulPalette {
 public:
-  RainbowPalette() = default;
+  explicit RainbowPalette(const float& brightness);
   ~RainbowPalette() override = default;
   RainbowPalette(const RainbowPalette&) = default;
   RainbowPalette(RainbowPalette&&) = default;
